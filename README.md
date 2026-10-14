@@ -130,6 +130,14 @@
 
 可以用 `scripts/05_trace.py` 印出任何一段實際走的路線，逐段檢查方向和匝道。
 
+## 發布到 GitHub Pages
+
+`.github/workflows/pages.yml` 會把 `output/` 整個目錄部署到 GitHub Pages，網站首頁就是互動地圖 `index.html`，靜態圖和 CSV 也可以從網站直接下載。
+
+- **觸發**：`main` 分支的 `output/` 有變動時會自動部署，也可以在 Actions 頁面手動執行「Deploy map to GitHub Pages」。
+- **第一次使用**：到 repo 的 Settings → Pages → Build and deployment，把 Source 設為「GitHub Actions」。
+- **私人 repo**：免費帳號的私人 repo 不能使用 Pages，需要改成公開 repo，或使用 GitHub Pro／Team 方案。另外要注意，就算 repo 是私人的，Pages 網站本身仍然是公開的。
+
 ## 重現
 
 ```bash
