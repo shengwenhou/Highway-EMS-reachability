@@ -1,0 +1,11 @@
+geopandas
+shapely
+pyproj
+pyogrio
+scipy
+numpy
+pandas
+networkx
+matplotlib
+osmium
+requests

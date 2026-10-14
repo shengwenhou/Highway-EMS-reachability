@@ -1,0 +1,303 @@
+<title>國道救護可及性地圖</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@700;900&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/*__LEAFLET_CSS__*/
+/* Layout: a road-atlas sheet — headline and controls on top, the island map as the main
+   object, the ranked list of worst points beside it (below it on phones). */
+:root {
+  --bg: #f5f6f2;
+  --surface: #ffffff;
+  --land: #e7eae3;
+  --land-edge: #bfc5ba;
+  --fg: #1e2420;
+  --muted: #5d665f;
+  --rule: #d6dbd3;
+  --accent: #0f5c4a;
+  --c0: #1f9e5a; --c1: #d9b310; --c2: #ec7a1c; --c3: #d33a2c; --c4: #7d3c98;
+  --cross-n: #c2410c; --cross-s: #1d4ed8; --same: #c9cdc6;
+  --font-display: "Noto Serif TC", "Songti TC", serif;
+  --font-body: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
+  --font-data: "IBM Plex Mono", ui-monospace, "SFMono-Regular", monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #131714; --surface: #1b201c; --land: #252b26; --land-edge: #3c453e;
+    --fg: #e8ece6; --muted: #9ba59d; --rule: #323a34; --accent: #5cc4a4;
+    --c0: #34b874; --c1: #e8c42e; --c2: #f28c38; --c3: #ec5a4a; --c4: #b072d0;
+    --cross-n: #f97316; --cross-s: #60a5fa; --same: #4a524c;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #131714; --surface: #1b201c; --land: #252b26; --land-edge: #3c453e;
+  --fg: #e8ece6; --muted: #9ba59d; --rule: #323a34; --accent: #5cc4a4;
+  --c0: #34b874; --c1: #e8c42e; --c2: #f28c38; --c3: #ec5a4a; --c4: #b072d0;
+  --cross-n: #f97316; --cross-s: #60a5fa; --same: #4a524c;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 15px; line-height: 1.6; }
+.wrap { max-width: 1200px; margin: 0 auto; padding-inline: 16px; padding-block: 24px 40px; display: grid; gap: 20px; }
+header { display: grid; gap: 8px; }
+.eyebrow { font-size: 12px; letter-spacing: .12em; color: var(--accent); font-weight: 700; }
+h1 { font-family: var(--font-display); font-weight: 900; font-size: clamp(26px, 4.4vw, 40px); line-height: 1.2; margin: 0; text-wrap: balance; }
+.lede { color: var(--muted); max-width: 68ch; margin: 0; }
+.stats { display: flex; flex-wrap: wrap; gap: 8px 28px; font-size: 13px; color: var(--muted); }
+.stats b { font-family: var(--font-data); font-weight: 500; color: var(--fg); font-size: 18px; margin-right: 4px; font-variant-numeric: tabular-nums; }
+.controls { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; }
+.seg { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--rule); border-radius: 8px; overflow: hidden; background: var(--surface); }
+.seg button { font: inherit; font-size: 14px; border: 0; background: transparent; color: var(--fg); padding: 7px 14px; cursor: pointer; }
+.seg button + button { border-left: 1px solid var(--rule); }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--surface); font-weight: 700; }
+.seg button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.ctl-label { font-size: 12px; color: var(--muted); margin-right: 8px; letter-spacing: .06em; }
+label.check { display: inline-flex; gap: 6px; align-items: center; font-size: 14px; cursor: pointer; }
+.main { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 20px; align-items: start; }
+@media (max-width: 900px) { .main { grid-template-columns: minmax(0, 1fr); } }
+.mapbox { position: relative; border: 1px solid var(--rule); border-radius: 10px; overflow: hidden; background: var(--bg); }
+#map { height: min(78vh, 820px); min-height: 460px; background: var(--bg); }
+.leaflet-container { background: var(--bg); font-family: var(--font-body); }
+.legend { position: absolute; left: 12px; bottom: 12px; z-index: 500; background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; padding: 10px 12px; font-size: 13px; display: grid; gap: 4px; }
+.legend .t { font-weight: 700; font-size: 12px; color: var(--muted); }
+.legend .row { display: flex; gap: 8px; align-items: center; font-variant-numeric: tabular-nums; }
+.sw { width: 22px; height: 5px; border-radius: 3px; display: inline-block; }
+.leaflet-popup-content-wrapper, .leaflet-popup-tip { background: var(--surface); color: var(--fg); }
+.leaflet-popup-content { margin: 12px 14px; font-size: 13px; line-height: 1.55; }
+.pop h3 { margin: 0 0 4px; font-size: 15px; }
+.pop .v { font-family: var(--font-data); font-variant-numeric: tabular-nums; }
+.pop .s { color: var(--muted); }
+.leaflet-bar a { background: var(--surface); color: var(--fg); border-color: var(--rule); }
+aside { display: grid; gap: 10px; min-width: 0; }
+aside h2 { font-family: var(--font-display); font-size: 20px; margin: 0; }
+aside p.note { margin: 0; font-size: 13px; color: var(--muted); }
+ol.rank { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--rule); }
+ol.rank li { border-bottom: 1px solid var(--rule); }
+ol.rank button { all: unset; box-sizing: border-box; width: 100%; display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; gap: 4px 10px; padding: 8px 4px; cursor: pointer; }
+ol.rank button:hover, ol.rank button:focus-visible { background: var(--surface); }
+ol.rank button:focus-visible { outline: 2px solid var(--accent); }
+.rk { font-family: var(--font-data); color: var(--muted); font-size: 13px; padding-top: 2px; }
+.loc { font-weight: 700; font-size: 14px; }
+.loc small { font-weight: 400; color: var(--muted); }
+.st { grid-column: 2 / 4; font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
+.val { font-family: var(--font-data); font-variant-numeric: tabular-nums; font-weight: 500; display: inline-flex; gap: 6px; align-items: center; white-space: nowrap; }
+.method { border-top: 1px solid var(--rule); padding-top: 16px; display: grid; gap: 8px; max-width: 80ch; }
+.method h2 { font-family: var(--font-display); font-size: 20px; margin: 0; }
+.method ul { margin: 0; padding-left: 1.2em; color: var(--muted); font-size: 14px; display: grid; gap: 4px; }
+.method a { color: var(--accent); }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">國道 1–10 號 · 每公里一段 · 雙向分開計算</div>
+    <h1>國道上出事時，救護車多久到、多久送到醫院？</h1>
+    <p class="lede">把每一條國道依行車方向切成一公里一段，找出每段裡最不利的點。反應：最近消防分隊的救護車必須從上游交流道進入同方向車道。送醫：從事故點沿同方向開到下一個出口，再送往最近的重度級急救責任醫院。都不限同縣市。</p>
+    <div class="stats" id="stats"></div>
+  </header>
+
+  <div class="controls">
+    <div><span class="ctl-label">指標</span>
+      <span class="seg" role="group" aria-label="指標">
+        <button type="button" id="m-distance" data-metric="distance" aria-pressed="true">反應距離</button>
+        <button type="button" id="m-time" data-metric="time" aria-pressed="false">反應時間</button>
+        <button type="button" id="m-hdistance" data-metric="hospital_distance" aria-pressed="false">送醫距離</button>
+        <button type="button" id="m-htime" data-metric="hospital_time" aria-pressed="false">送醫時間</button>
+        <button type="button" id="m-cross" data-metric="cross" aria-pressed="false">跨區救護</button>
+      </span>
+    </div>
+    <div><span class="ctl-label">方向</span>
+      <span class="seg" role="group" aria-label="方向">
+        <button type="button" id="d-all" data-dir="all" aria-pressed="true">雙向</button>
+        <button type="button" id="d-nb" data-dir="北上／東行" aria-pressed="false">北上／東行</button>
+        <button type="button" id="d-sb" data-dir="南下／西行" aria-pressed="false">南下／西行</button>
+      </span>
+    </div>
+    <label class="check"><input type="checkbox" id="show-stations"> 顯示消防分隊</label>
+    <label class="check"><input type="checkbox" id="show-hospitals"> 顯示重度級醫院</label>
+  </div>
+
+  <div class="main">
+    <div class="mapbox">
+      <div id="map" aria-label="國道救護可及性地圖"></div>
+      <div class="legend" id="legend"></div>
+    </div>
+    <aside>
+      <h2 id="rank-title">最遠的 20 個點位</h2>
+      <p class="note" id="rank-note"></p>
+      <ol class="rank" id="rank"></ol>
+    </aside>
+  </div>
+
+  <section class="method">
+    <h2>計算方式</h2>
+    <ul>
+      <li>路網：OpenStreetMap（BBBike 2026-10-14 擷取），國道、快速道路到巷弄共約 187 萬個節點；遵守單行道與匝道方向（巷弄與 living street 除外）。</li>
+      <li>消防分隊：內政部消防署「救援與應變單位點位」，保留外勤分隊與中隊共 608 處，不含局本部、大隊部、特搜單位，以及不出勤國道救護的港區分隊；6 處原始座標為 0 的分隊以地址補上座標。</li>
+      <li>方向與路口：事故點只能經由同方向上游的交流道或系統交流道抵達，不跨越中央分隔島、不使用緊急出入口。</li>
+      <li>速度：OSM 速限標示，未標示者以道路等級預設（國道 100、快速道路 80、省道 60、縣道 50、市區 30–40 km/h），不計壅塞與出勤準備時間（約 1–1.5 分鐘需另加）。</li>
+      <li>里程：以交流道編號（即里程）內插，誤差約 ±1 公里；五楊、汐五高架依平行主線里程標示。距離最短與時間最短可能來自不同分隊。</li>
+      <li>送醫：衛福部「急救責任醫院分區名單」（更新日 115/4/29）中的重度級醫院 54 家；與兒童醫院合併評定者以成人醫院本院定位。傷患必須沿同方向開到下一個出口，再走一般道路，不含現場處置時間。</li>
+      <li>未納入：國道 2 甲（OSM 中僅零星路段標為國道）。</li>
+    </ul>
+  </section>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+const DATA = __DATA__;
+const M = DATA.metrics;
+const GROUP = { "北上": "北上／東行", "東行": "北上／東行", "南下": "南下／西行", "西行": "南下／西行" };
+const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const color = (v) => css("--c" + M[metric].bins.filter((b) => v >= b).length);
+const isCross = () => metric === "cross";
+const crossVar = (d) => (GROUP[d] === "北上／東行" ? "--cross-n" : "--cross-s");
+const fmt = (v, d = 1) => Number(v).toFixed(d);
+const isHosp = () => metric.startsWith("hospital");
+let metric = "distance", dir = "all";
+try { const m = localStorage.getItem("ems-metric"); if (m && (M[m] || m === "cross")) metric = m; } catch (e) {}
+
+const map = L.map("map", { zoomSnap: 0.25, preferCanvas: true, attributionControl: true })
+  .fitBounds([[21.9, 120.0], [25.3, 122.0]]);
+map.attributionControl.setPrefix(false).addAttribution("© OpenStreetMap contributors · 消防署");
+
+const countyLayer = L.geoJSON(DATA.counties, { interactive: false, style: () => ({}) }).addTo(map);
+const stationLayer = L.layerGroup();
+DATA.stations.forEach(([n, lon, lat]) => {
+  L.circleMarker([lat, lon], { radius: 3, weight: 1, fillOpacity: 1 })
+    .bindTooltip(n.replace(/^.*?消防局/, "")).addTo(stationLayer);
+});
+const hospitalLayer = L.layerGroup();
+DATA.hospitals.forEach(([n, lon, lat]) => {
+  L.circleMarker([lat, lon], { radius: 6, weight: 2, fillOpacity: 1 }).bindTooltip(n).addTo(hospitalLayer);
+});
+
+const segs = DATA.segments.map((s, i) => {
+  const [ref, d, main, road, km, dist, time, sd, stt, hdist, htime, hd, ht, flat] = s;
+  const ll = [];
+  for (let i = 0; i < flat.length; i += 2) ll.push([flat[i + 1], flat[i]]);
+  return { ref, d, main, road, km, dist, time, sd, stt, hdist, htime, hd, ht, cross: DATA.cross[i], ll, line: null };
+});
+const segLayer = L.layerGroup().addTo(map);
+const canvas = L.canvas({ padding: 0.3, tolerance: 6 });
+
+function stName(i) { return i >= 0 ? DATA.stations[i][0] : "—"; }
+function hpName(i) { return i >= 0 ? DATA.hospitals[i][0] : "—"; }
+const VAL = { distance: (s) => s.dist, time: (s) => s.time, hospital_distance: (s) => s.hdist, hospital_time: (s) => s.htime };
+function popup(s) {
+  return `<div class="pop"><h3>國道${s.ref} ${s.d} ${s.km}K–${s.km + 1}K</h3>` +
+    (s.main ? "" : `<div class="s">${s.road}</div>`) +
+    `<div>反應距離 <span class="v">${fmt(s.dist)} 公里</span></div>` +
+    `<div class="s">${stName(s.sd)}</div>` +
+    `<div>反應時間 <span class="v">${fmt(s.time)} 分鐘</span></div>` +
+    `<div class="s">${stName(s.stt)}</div>` +
+    `<div>送醫距離 <span class="v">${fmt(s.hdist)} 公里</span></div>` +
+    `<div class="s">${hpName(s.hd)}</div>` +
+    `<div>送醫時間 <span class="v">${fmt(s.htime)} 分鐘</span></div>` +
+    `<div class="s">${hpName(s.ht)}</div>` +
+    (s.cross ? `<div><b>跨區救護較近</b></div>` : "") + `</div>`;
+}
+
+function themeStatic() {
+  countyLayer.setStyle({ color: css("--land-edge"), weight: 0.8, fillColor: css("--land"), fillOpacity: 1 });
+  stationLayer.eachLayer((m) => m.setStyle({ color: css("--surface"), fillColor: css("--fg") }));
+  hospitalLayer.eachLayer((m) => m.setStyle({ color: css("--fg"), fillColor: css("--surface") }));
+}
+
+function draw() {
+  segLayer.clearLayers();
+  const val = isCross() ? (s) => s.cross : VAL[metric];
+  const segColor = isCross() ? (s) => css(s.cross ? crossVar(s.d) : "--same") : (s) => color(val(s));
+  const shown = segs.filter((s) => dir === "all" || GROUP[s.d] === dir).sort((a, b) => val(a) - val(b));
+  shown.forEach((s) => {
+    s.line = L.polyline(s.ll, { renderer: canvas, color: segColor(s), weight: isCross() && !s.cross ? 3 : 4, lineCap: "round", opacity: 1 })
+      .bindPopup(() => popup(s)).addTo(segLayer);
+  });
+  if (isCross()) {
+    document.getElementById("legend").innerHTML = `<div class="t">最近分隊（行車距離）</div>` +
+      (dir !== "南下／西行" ? `<div class="row"><span class="sw" style="background:${css("--cross-n")}"></span>跨區救護較近（北上／東行）</div>` : "") +
+      (dir !== "北上／東行" ? `<div class="row"><span class="sw" style="background:${css("--cross-s")}"></span>跨區救護較近（南下／西行）</div>` : "") +
+      `<div class="row"><span class="sw" style="background:${css("--same")}"></span>同縣市救護較近</div>`;
+  } else {
+    const b = M[metric].bins;
+    const labels = [`< ${b[0]}`, `${b[0]}–${b[1]}`, `${b[1]}–${b[2]}`, `${b[2]}–${b[3]}`, `≥ ${b[3]}`];
+    document.getElementById("legend").innerHTML = `<div class="t">${M[metric].name}（${M[metric].unit}）</div>` +
+      labels.map((l, i) => `<div class="row"><span class="sw" style="background:${css("--c" + i)}"></span>${l}</div>`).join("");
+  }
+  drawRank();
+  document.querySelectorAll("[data-metric]").forEach((b) => b.setAttribute("aria-pressed", b.dataset.metric === metric));
+  document.querySelectorAll("[data-dir]").forEach((b) => b.setAttribute("aria-pressed", b.dataset.dir === dir));
+}
+
+function drawCrossRank() {
+  const list = DATA.cross_runs.filter((p) => dir === "all" || GROUP[p[1]] === dir).slice(0, 20);
+  document.getElementById("rank-title").textContent = `跨區救護較近的最長 ${list.length} 段`;
+  document.getElementById("rank-note").textContent =
+    `主線 ${DATA.summary.cross_main} 個公里段（雙向）由鄰近縣市的分隊救護較近。依連續長度排序，點一下可在地圖上定位。`;
+  const ol = document.getElementById("rank");
+  ol.innerHTML = "";
+  list.forEach((p, i) => {
+    const [ref, d, k0, k1, len, county, st, stCounty, lon, lat] = p;
+    const li = document.createElement("li");
+    const lo = Math.min(k0, k1), hi = Math.max(k0, k1) + 1;
+    li.innerHTML = `<button type="button"><span class="rk">${i + 1}</span>` +
+      `<span class="loc">國道${ref} ${d} ${lo}K–${hi}K <small>${county}</small></span>` +
+      `<span class="val"><span class="sw" style="background:${css(crossVar(d))}"></span>${len} 公里</span>` +
+      `<span class="st">最近：${st}（${stCounty}）</span></button>`;
+    li.querySelector("button").addEventListener("click", () => map.flyTo([lat, lon], 11, { duration: 0.6 }));
+    ol.appendChild(li);
+  });
+}
+
+function drawRank() {
+  if (isCross()) return drawCrossRank();
+  const list = DATA.peaks[metric].filter((p) => dir === "all" || GROUP[p[1]] === dir);
+  document.getElementById("rank-title").textContent = `${M[metric].name}最${metric.endsWith("time") ? "久" : "遠"}的 ${list.length} 個點位`;
+  document.getElementById("rank-note").textContent = isHosp()
+    ? "每個點位是一段「沒有下游出口」區間的起點（剛錯過出口），點一下可在地圖上定位。"
+    : "每個點位是一段「沒有上游入口」區間的終點，點一下可在地圖上定位。";
+  const ol = document.getElementById("rank");
+  ol.innerHTML = "";
+  list.forEach((p, i) => {
+    const [ref, d, road, km, v, st, lon, lat] = p;
+    const li = document.createElement("li");
+    const isBranch = road && !/高速公路|支線|環線|聯絡線/.test(road);
+    li.innerHTML = `<button type="button"><span class="rk">${i + 1}</span>` +
+      `<span class="loc">國道${ref} ${d} ${km}K ${isBranch ? `<small>${road}</small>` : ""}</span>` +
+      `<span class="val"><span class="sw" style="background:${color(v)}"></span>${fmt(v)} ${M[metric].unit}</span>` +
+      `<span class="st">${isHosp() ? "送往" : "最近"}：${st}</span></button>`;
+    li.querySelector("button").addEventListener("click", () => {
+      map.flyTo([lat, lon], 12, { duration: 0.6 });
+      const s = segs.find((x) => x.ref === ref && x.d === d && x.km === km && x.line && x.road === road)
+        || segs.find((x) => x.ref === ref && x.d === d && x.km === km && x.line);
+      if (s) setTimeout(() => s.line.openPopup(), 650);
+    });
+    ol.appendChild(li);
+  });
+}
+
+const S = DATA.summary, MD = S.median;
+document.getElementById("stats").innerHTML =
+  `<span><b>${S.km_main.toLocaleString()}</b>個主線公里段（雙向）</span>` +
+  `<span><b>${S.stations}</b>個消防分隊・<b>${S.hospitals}</b>家重度級醫院</span>` +
+  `<span>反應中位數 <b>${fmt(MD.distance)}</b>公里／<b>${fmt(MD.time)}</b>分鐘</span>` +
+  `<span>送醫中位數 <b>${fmt(MD.hospital_distance)}</b>公里／<b>${fmt(MD.hospital_time)}</b>分鐘</span>`;
+
+document.querySelectorAll("[data-metric]").forEach((b) => b.addEventListener("click", () => {
+  metric = b.dataset.metric; try { localStorage.setItem("ems-metric", metric); } catch (e) {} draw();
+}));
+document.querySelectorAll("[data-dir]").forEach((b) => b.addEventListener("click", () => { dir = b.dataset.dir; draw(); }));
+document.getElementById("show-stations").addEventListener("change", (e) => {
+  e.target.checked ? stationLayer.addTo(map) : stationLayer.remove();
+});
+document.getElementById("show-hospitals").addEventListener("change", (e) => {
+  e.target.checked ? hospitalLayer.addTo(map) : hospitalLayer.remove();
+});
+const mq = window.matchMedia("(prefers-color-scheme: dark)");
+const retheme = () => { themeStatic(); draw(); };
+mq.addEventListener ? mq.addEventListener("change", retheme) : mq.addListener(retheme);
+new MutationObserver(retheme).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+themeStatic();
+draw();
+</script>
