@@ -215,8 +215,8 @@ function draw() {
   });
   if (isCross()) {
     document.getElementById("legend").innerHTML = `<div class="t">最近分隊（行車距離）</div>` +
-      `<div class="row"><span class="sw" style="background:${css("--cross")}"></span>來自鄰近縣市</div>` +
-      `<div class="row"><span class="sw" style="background:${css("--same")}"></span>同一縣市</div>`;
+      `<div class="row"><span class="sw" style="background:${css("--cross")}"></span>跨區救護較近</div>` +
+      `<div class="row"><span class="sw" style="background:${css("--same")}"></span>同縣市救護較近</div>`;
   } else {
     const b = M[metric].bins;
     const labels = [`< ${b[0]}`, `${b[0]}–${b[1]}`, `${b[1]}–${b[2]}`, `${b[2]}–${b[3]}`, `≥ ${b[3]}`];

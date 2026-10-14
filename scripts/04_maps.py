@@ -157,8 +157,8 @@ def static_cross_map(seg, counties, runs):
         ax.set_aspect(1 / np.cos(np.radians(23.7)))
         ax.set_axis_off()
         ax.set_title(f"{grp}　{int(main.cross_county.sum())} / {len(main)} 個主線公里段", fontsize=15)
-    handles = [Patch(color=CROSS_COLOR, label="最近分隊屬於鄰近縣市"),
-               Patch(color="#c9cdc6", label="最近分隊屬於同一縣市")]
+    handles = [Patch(color=CROSS_COLOR, label="跨區救護較近"),
+               Patch(color="#c9cdc6", label="同縣市救護較近")]
     fig.legend(handles=handles, loc="lower center", ncol=2, frameon=False, fontsize=11)
     fig.suptitle("國道事故點最近的消防分隊（以行車距離計）來自鄰近縣市的路段", fontsize=17)
     fig.text(0.5, 0.045, "依車道方向計算；一公里段內過半數的點由外縣市分隊最近即標示。"
