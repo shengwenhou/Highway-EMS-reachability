@@ -306,6 +306,69 @@ def _round(c):
     return [_round(x) for x in c]
 
 
+LIMIT_CODES = {"平面彎道": 1, "縱坡坡頂": 2, "資料起點": 3}
+
+
+def query_data(points):
+    """Precomputed lookup table for the in-page point query (columnar, compact).
+
+    Points are ordered by carriageway and by distance along it, so a point's upstream
+    neighbours are the entries just before it. Percentiles compare against every main-line
+    100-m point in the country: 80 means harder than 80 % of them."""
+    pts = points.sort_values(["chain", "s_m"]).reset_index(drop=True)
+    main = pts[pts.kind == "main"]
+
+    def pct(col):
+        ref = np.sort(main[col].dropna().values)
+        return np.round(np.searchsorted(ref, pts[col].values, side="left") / len(ref) * 100).astype(int)
+
+    def codes(series):
+        cats = pd.unique(series.fillna(""))
+        lut = {c: i for i, c in enumerate(cats)}
+        return [lut[v] for v in series.fillna("")], list(cats)
+
+    chains_meta = json.load(open(PROC / "chains.json"))
+    sd, st_names = codes(pd.concat([pts.station_dist, pts.station_time]))
+    stations = st_names
+    st_idx = {n: i for i, n in enumerate(stations)}
+    hs_names = list(pd.unique(pd.concat([pts.hospital_dist, pts.hospital_time]).fillna("")))
+    hs_idx = {n: i for i, n in enumerate(hs_names)}
+    cy, counties = codes(pts.county)
+    rn, roads = codes(pts.road_name)
+    chains = []
+    for ch in chains_meta:
+        idx = np.flatnonzero(pts.chain.values == ch["chain"])
+        if not len(idx):
+            continue
+        sub = pts.iloc[idx]
+        seen, junc = set(), []
+        for sj, kmj, name in ch["junctions"]:
+            if name and name not in seen:
+                seen.add(name)
+                junc.append([round(sj), kmj, name])
+        chains.append({"id": ch["chain"], "ref": ch["ref"], "dir": ch["direction"], "kind": ch["kind"],
+                       "name": ch["name"], "i0": int(idx[0]), "i1": int(idx[-1]),
+                       "km0": float(sub.km.min()), "km1": float(sub.km.max()), "junc": junc})
+    r1 = lambda c: [round(float(v), 1) for v in pts[c].fillna(-1)]
+    return {
+        "chains": chains, "stations": stations, "hospitals": hs_names, "counties": counties,
+        "roads": roads,
+        "s": [int(v) for v in pts.s_m], "km": r1("km"),
+        "lon": [round(float(v), 5) for v in pts.lon], "lat": [round(float(v), 5) for v in pts.lat],
+        "d": r1("dist_km"), "t": r1("time_min"), "hd": r1("hosp_dist_km"), "ht": r1("hosp_time_min"),
+        "sd": [st_idx[v] for v in pts.station_dist], "st": [st_idx[v] for v in pts.station_time],
+        "hs": [hs_idx[v] for v in pts.hospital_dist], "hts": [hs_idx[v] for v in pts.hospital_time],
+        "cy": cy, "rn": rn,
+        "x": [int(bool(v)) for v in pts.cross_county_dist],
+        "r": [int(v) for v in pts.risk.fillna(-1)], "a": [int(v) for v in pts.asd_m.fillna(-1)],
+        "q": [int(v) for v in pts.ssd_m.fillna(-1)],
+        "l": [LIMIT_CODES.get(v, 0) for v in pts.limit.fillna("")],
+        "b": [int(v) for v in pts.bridge.fillna(0)], "tu": [int(v) for v in pts.tunnel.fillna(0)],
+        "pd": pct("dist_km").tolist(), "pt": pct("time_min").tolist(),
+        "ph": pct("hosp_dist_km").tolist(), "pht": pct("hosp_time_min").tolist(),
+    }
+
+
 def main():
     seg, counties, stations, hospitals = load()
     for m in METRICS:
@@ -354,6 +417,7 @@ def main():
                          r.limit, r.county, r.lon, r.lat] for r in red[red.kind == "main"].head(30).itertuples()]
     main_pts = points[points.kind == "main"]
     data["risk_share"] = {k: float((main_pts.risk == k).mean()) for k in (0, 1, 2)}
+    data["query"] = query_data(points)
     main_seg = seg[seg.kind == "main"]
     data["summary"] = {
         "km_main": int(len(main_seg)),

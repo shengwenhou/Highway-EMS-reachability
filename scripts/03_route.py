@@ -240,14 +240,40 @@ def chain_geometry(chain, nodes):
     return p, x, y, s
 
 
-def km_mapping(p, s, jkm):
+def interchange_anchors(chains, nodes, jkm):
+    """Interchange centres per freeway. A motorway_junction node marks where an exit leaves its
+    own carriageway, which is before the interchange in that direction of travel, so the two
+    directions' nodes sit on opposite sides of it. Their mean position is the interchange."""
+    pos = defaultdict(list)
+    for ch in chains:
+        for n in ch["nodes"]:
+            if n in jkm:
+                pos[(ch["ref"], jkm[n][1], jkm[n][0])].append((nodes.x.values[n], nodes.y.values[n]))
+    return {k: np.mean(v, axis=0) for k, v in pos.items()}
+
+
+def anchors_on_chain(ref, x, y, s, centres, max_off=400.0):
+    """Project each interchange centre of this freeway onto the chain -> (s, km) anchors."""
+    out = []
+    for (r, name, kmv), (cx, cy) in centres.items():
+        if r != ref:
+            continue
+        d = np.hypot(x - cx, y - cy)
+        k = int(np.argmin(d))
+        if d[k] <= max_off:
+            out.append((s[k], kmv))
+    return out
+
+
+def km_mapping(p, s, jkm, anchors=None):
     """Chain distance (m) -> official mileage (km), interpolated between interchange numbers.
 
     Taiwanese interchange numbers are their mileage, so junction nodes on the chain give
     (distance, km) anchors. Outliers are dropped with a robust linear fit; outside the first
     and last anchor the mileage runs at 1 km per km. Returns None when there are too few anchors.
     """
-    pts = sorted((s[i], jkm[n][0]) for i, n in enumerate(p) if n in jkm)
+    pts = sorted(anchors) if anchors is not None else sorted(
+        (s[i], jkm[n][0]) for i, n in enumerate(p) if n in jkm)
     if len(pts) < 2:
         return None
     a = np.array(pts)
@@ -349,6 +375,7 @@ def main():
     ekmh = edges.groupby(["u", "v"]).kmh.max()
 
     chain_way = mw.groupby(["u", "v"]).way.first()
+    centres = interchange_anchors(chains, nodes, jkm)
     mains = []
     order = sorted(range(len(chains)), key=lambda i: chains[i]["kind"] != "main")
     for ci in order:
@@ -359,7 +386,8 @@ def main():
                            for a, b in zip(smp["p"][:-1], smp["p"][1:])
                            if (a, b) in chain_way.index])
         ch["name"] = names.value_counts().index[0] if len(names) else ""
-        f = km_mapping(smp["p"], smp["s"], jkm)
+        f = km_mapping(smp["p"], smp["s"], jkm,
+                       anchors_on_chain(ch["ref"], smp["x"], smp["y"], smp["s"], centres))
         ch["direction"] = direction_name(ch["ref"], smp["x"], smp["y"])
         ch["km_source"] = "interchange"
         if ch["kind"] == "main":
@@ -402,7 +430,9 @@ def main():
             "dist_km": np.round(Dm / 1000, 3), "station_dist": st.name.values[sd],
             "time_min": np.round(Ts / 60, 3), "station_time": st.name.values[stt],
             "hosp_dist_km": np.round(HDm / 1000, 3), "hospital_dist": hp.name.values[hd],
-            "hosp_time_min": np.round(HTs / 60, 3), "hospital_time": hp.name.values[ht]}))
+            "hosp_time_min": np.round(HTs / 60, 3), "hospital_time": hp.name.values[ht],
+            "road_name": [ways[chain_way[(a, b)]]["tags"].get("name", "") if (a, b) in chain_way.index
+                          else "" for a, b in zip(p[ei], p[ei + 1])]}))
         # carriageway geometry for later analyses (sight distance etc.)
         p_lon, p_lat = to_ll.transform(smp["x"], smp["y"])
         flags = [ways[chain_way[(a, b)]]["tags"] if (a, b) in chain_way.index else {}
@@ -415,7 +445,10 @@ def main():
             "km": np.round(np.interp(smp["s"], smp["ss"], km), 3).tolist(),
             "tunnel": [1 if t.get("tunnel") not in (None, "no") else 0 for t in flags],
             "bridge": [1 if t.get("bridge") not in (None, "no") else 0 for t in flags],
-            "maxspeed": [r_speed(t) for t in flags]})
+            "maxspeed": [r_speed(t) for t in flags],
+            # interchanges on this carriageway: [distance along chain (m), mileage, name]
+            "junctions": [[round(float(smp["s"][i]), 1), jkm[n][0], jkm[n][1]]
+                          for i, n in enumerate(p) if n in jkm]})
         for k in np.unique(seg):
             idx = np.flatnonzero(seg == k)
             if len(idx) < 2:
