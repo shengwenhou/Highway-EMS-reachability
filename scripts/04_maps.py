@@ -81,7 +81,7 @@ def load():
     return seg, counties, stations, hospitals
 
 
-CROSS_COLOR = "#c2410c"
+CROSS_COLOR = {"北上／東行": "#c2410c", "南下／西行": "#1d4ed8"}
 
 
 def norm_county(name):
@@ -147,7 +147,7 @@ def static_cross_map(seg, counties, runs):
     for ax, grp in zip(axes, ["北上／東行", "南下／西行"]):
         counties.plot(ax=ax, color="#eef0ec", edgecolor="#b9beb6", linewidth=0.5)
         sub = seg[seg.direction.map(DIR_GROUP) == grp]
-        for flag, color, lw in [(False, "#c9cdc6", 2.0), (True, CROSS_COLOR, 3.0)]:
+        for flag, color, lw in [(False, "#c9cdc6", 2.0), (True, CROSS_COLOR[grp], 3.0)]:
             part = sub[sub.cross_county == flag]
             ax.add_collection(LineCollection([np.array(c) for c in part.coords], colors=color,
                                              linewidths=lw, capstyle="round"))
@@ -157,10 +157,11 @@ def static_cross_map(seg, counties, runs):
         ax.set_aspect(1 / np.cos(np.radians(23.7)))
         ax.set_axis_off()
         ax.set_title(f"{grp}　{int(main.cross_county.sum())} / {len(main)} 個主線公里段", fontsize=15)
-    handles = [Patch(color=CROSS_COLOR, label="跨區救護較近"),
+    handles = [Patch(color=CROSS_COLOR["北上／東行"], label="跨區救護較近（北上／東行）"),
+               Patch(color=CROSS_COLOR["南下／西行"], label="跨區救護較近（南下／西行）"),
                Patch(color="#c9cdc6", label="同縣市救護較近")]
-    fig.legend(handles=handles, loc="lower center", ncol=2, frameon=False, fontsize=11)
-    fig.suptitle("國道事故點最近的消防分隊（以行車距離計）來自鄰近縣市的路段", fontsize=17)
+    fig.legend(handles=handles, loc="lower center", ncol=3, frameon=False, fontsize=11)
+    fig.suptitle("跨區救護：最近的消防分隊（以行車距離計）來自鄰近縣市的路段", fontsize=17)
     fig.text(0.5, 0.045, "依車道方向計算；一公里段內過半數的點由外縣市分隊最近即標示。"
              "縣市界：taiwan-atlas；分隊所屬縣市依消防局名稱", ha="center", fontsize=9, color="#555")
     fig.subplots_adjust(left=0.02, right=0.98, top=0.92, bottom=0.08, wspace=0.02)
