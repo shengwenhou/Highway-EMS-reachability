@@ -377,7 +377,7 @@ def main():
             else:
                 ch["km"], ch["km_source"] = smp["ss"] / 1000, "geometric"
 
-    rows, feats = [], []
+    rows, feats, samples = [], [], []
     for ci in order:
         ch = chains[ci]
         smp, km = ch["smp"], ch["km"]
@@ -394,6 +394,10 @@ def main():
         hd, ht = hlab_d[head], hlab_t[head]
         seg = np.clip(np.floor(km).astype(int), 0, None)
         lon_all, lat_all = to_ll.transform(smp["px"], smp["py"])
+        samples.append(pd.DataFrame({
+            "chain": ci, "km_from": seg, "km": np.round(km, 2),
+            "lon": np.round(lon_all, 6), "lat": np.round(lat_all, 6),
+            "station_dist": st.name.values[sd], "station_time": st.name.values[stt]}))
         for k in np.unique(seg):
             idx = np.flatnonzero(seg == k)
             if len(idx) < 2:
@@ -436,6 +440,7 @@ def main():
     df.to_csv(OUT / "segments.csv", index=False)
     json.dump({"type": "FeatureCollection", "features": feats},
               open(OUT / "segments.geojson", "w"), ensure_ascii=False)
+    pd.concat(samples).to_csv(OUT / "samples.csv", index=False)
     st.to_csv(OUT / "stations_snapped.csv", index=False)
     hp.to_csv(OUT / "hospitals_snapped.csv", index=False)
     print(df.describe())

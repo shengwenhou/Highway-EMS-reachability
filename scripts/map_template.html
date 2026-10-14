@@ -16,6 +16,7 @@
   --rule: #d6dbd3;
   --accent: #0f5c4a;
   --c0: #1f9e5a; --c1: #d9b310; --c2: #ec7a1c; --c3: #d33a2c; --c4: #7d3c98;
+  --cross: #c2410c; --same: #c9cdc6;
   --font-display: "Noto Serif TC", "Songti TC", serif;
   --font-body: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
   --font-data: "IBM Plex Mono", ui-monospace, "SFMono-Regular", monospace;
@@ -25,6 +26,7 @@
     --bg: #131714; --surface: #1b201c; --land: #252b26; --land-edge: #3c453e;
     --fg: #e8ece6; --muted: #9ba59d; --rule: #323a34; --accent: #5cc4a4;
     --c0: #34b874; --c1: #e8c42e; --c2: #f28c38; --c3: #ec5a4a; --c4: #b072d0;
+    --cross: #f97316; --same: #4a524c;
     color-scheme: dark;
   }
 }
@@ -32,6 +34,7 @@
   --bg: #131714; --surface: #1b201c; --land: #252b26; --land-edge: #3c453e;
   --fg: #e8ece6; --muted: #9ba59d; --rule: #323a34; --accent: #5cc4a4;
   --c0: #34b874; --c1: #e8c42e; --c2: #f28c38; --c3: #ec5a4a; --c4: #b072d0;
+  --cross: #f97316; --same: #4a524c;
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
@@ -101,6 +104,7 @@ ol.rank button:focus-visible { outline: 2px solid var(--accent); }
         <button type="button" id="m-time" data-metric="time" aria-pressed="false">反應時間</button>
         <button type="button" id="m-hdistance" data-metric="hospital_distance" aria-pressed="false">送醫距離</button>
         <button type="button" id="m-htime" data-metric="hospital_time" aria-pressed="false">送醫時間</button>
+        <button type="button" id="m-cross" data-metric="cross" aria-pressed="false">跨縣市</button>
       </span>
     </div>
     <div><span class="ctl-label">方向</span>
@@ -147,10 +151,11 @@ const M = DATA.metrics;
 const GROUP = { "北上": "北上／東行", "東行": "北上／東行", "南下": "南下／西行", "西行": "南下／西行" };
 const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
 const color = (v) => css("--c" + M[metric].bins.filter((b) => v >= b).length);
+const isCross = () => metric === "cross";
 const fmt = (v, d = 1) => Number(v).toFixed(d);
 const isHosp = () => metric.startsWith("hospital");
 let metric = "distance", dir = "all";
-try { const m = localStorage.getItem("ems-metric"); if (m && M[m]) metric = m; } catch (e) {}
+try { const m = localStorage.getItem("ems-metric"); if (m && (M[m] || m === "cross")) metric = m; } catch (e) {}
 
 const map = L.map("map", { zoomSnap: 0.25, preferCanvas: true, attributionControl: true })
   .fitBounds([[21.9, 120.0], [25.3, 122.0]]);
@@ -167,11 +172,11 @@ DATA.hospitals.forEach(([n, lon, lat]) => {
   L.circleMarker([lat, lon], { radius: 6, weight: 2, fillOpacity: 1 }).bindTooltip(n).addTo(hospitalLayer);
 });
 
-const segs = DATA.segments.map((s) => {
+const segs = DATA.segments.map((s, i) => {
   const [ref, d, main, road, km, dist, time, sd, stt, hdist, htime, hd, ht, flat] = s;
   const ll = [];
   for (let i = 0; i < flat.length; i += 2) ll.push([flat[i + 1], flat[i]]);
-  return { ref, d, main, road, km, dist, time, sd, stt, hdist, htime, hd, ht, ll, line: null };
+  return { ref, d, main, road, km, dist, time, sd, stt, hdist, htime, hd, ht, cross: DATA.cross[i], ll, line: null };
 });
 const segLayer = L.layerGroup().addTo(map);
 const canvas = L.canvas({ padding: 0.3, tolerance: 6 });
@@ -189,7 +194,8 @@ function popup(s) {
     `<div>送醫距離 <span class="v">${fmt(s.hdist)} 公里</span></div>` +
     `<div class="s">${hpName(s.hd)}</div>` +
     `<div>送醫時間 <span class="v">${fmt(s.htime)} 分鐘</span></div>` +
-    `<div class="s">${hpName(s.ht)}</div></div>`;
+    `<div class="s">${hpName(s.ht)}</div>` +
+    (s.cross ? `<div><b>最近分隊來自鄰近縣市</b></div>` : "") + `</div>`;
 }
 
 function themeStatic() {
@@ -200,22 +206,50 @@ function themeStatic() {
 
 function draw() {
   segLayer.clearLayers();
-  const val = VAL[metric];
+  const val = isCross() ? (s) => s.cross : VAL[metric];
+  const segColor = isCross() ? (s) => css(s.cross ? "--cross" : "--same") : (s) => color(val(s));
   const shown = segs.filter((s) => dir === "all" || GROUP[s.d] === dir).sort((a, b) => val(a) - val(b));
   shown.forEach((s) => {
-    s.line = L.polyline(s.ll, { renderer: canvas, color: color(val(s)), weight: 4, lineCap: "round", opacity: 1 })
+    s.line = L.polyline(s.ll, { renderer: canvas, color: segColor(s), weight: isCross() && !s.cross ? 3 : 4, lineCap: "round", opacity: 1 })
       .bindPopup(() => popup(s)).addTo(segLayer);
   });
-  const b = M[metric].bins;
-  const labels = [`< ${b[0]}`, `${b[0]}–${b[1]}`, `${b[1]}–${b[2]}`, `${b[2]}–${b[3]}`, `≥ ${b[3]}`];
-  document.getElementById("legend").innerHTML = `<div class="t">${M[metric].name}（${M[metric].unit}）</div>` +
-    labels.map((l, i) => `<div class="row"><span class="sw" style="background:${css("--c" + i)}"></span>${l}</div>`).join("");
+  if (isCross()) {
+    document.getElementById("legend").innerHTML = `<div class="t">最近分隊（行車距離）</div>` +
+      `<div class="row"><span class="sw" style="background:${css("--cross")}"></span>來自鄰近縣市</div>` +
+      `<div class="row"><span class="sw" style="background:${css("--same")}"></span>同一縣市</div>`;
+  } else {
+    const b = M[metric].bins;
+    const labels = [`< ${b[0]}`, `${b[0]}–${b[1]}`, `${b[1]}–${b[2]}`, `${b[2]}–${b[3]}`, `≥ ${b[3]}`];
+    document.getElementById("legend").innerHTML = `<div class="t">${M[metric].name}（${M[metric].unit}）</div>` +
+      labels.map((l, i) => `<div class="row"><span class="sw" style="background:${css("--c" + i)}"></span>${l}</div>`).join("");
+  }
   drawRank();
   document.querySelectorAll("[data-metric]").forEach((b) => b.setAttribute("aria-pressed", b.dataset.metric === metric));
   document.querySelectorAll("[data-dir]").forEach((b) => b.setAttribute("aria-pressed", b.dataset.dir === dir));
 }
 
+function drawCrossRank() {
+  const list = DATA.cross_runs.filter((p) => dir === "all" || GROUP[p[1]] === dir).slice(0, 20);
+  document.getElementById("rank-title").textContent = `由鄰近縣市分隊最近的最長 ${list.length} 段`;
+  document.getElementById("rank-note").textContent =
+    `主線 ${DATA.summary.cross_main} 個公里段（雙向）最近的分隊在鄰近縣市。依連續長度排序，點一下可在地圖上定位。`;
+  const ol = document.getElementById("rank");
+  ol.innerHTML = "";
+  list.forEach((p, i) => {
+    const [ref, d, k0, k1, len, county, st, stCounty, lon, lat] = p;
+    const li = document.createElement("li");
+    const lo = Math.min(k0, k1), hi = Math.max(k0, k1) + 1;
+    li.innerHTML = `<button type="button"><span class="rk">${i + 1}</span>` +
+      `<span class="loc">國道${ref} ${d} ${lo}K–${hi}K <small>${county}</small></span>` +
+      `<span class="val"><span class="sw" style="background:${css("--cross")}"></span>${len} 公里</span>` +
+      `<span class="st">最近：${st}（${stCounty}）</span></button>`;
+    li.querySelector("button").addEventListener("click", () => map.flyTo([lat, lon], 11, { duration: 0.6 }));
+    ol.appendChild(li);
+  });
+}
+
 function drawRank() {
+  if (isCross()) return drawCrossRank();
   const list = DATA.peaks[metric].filter((p) => dir === "all" || GROUP[p[1]] === dir);
   document.getElementById("rank-title").textContent = `${M[metric].name}最${metric.endsWith("time") ? "久" : "遠"}的 ${list.length} 個點位`;
   document.getElementById("rank-note").textContent = isHosp()
