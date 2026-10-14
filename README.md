@@ -151,3 +151,11 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt   # 另需 ap
 ```
 
 縣市底圖來自 npm 套件 [`taiwan-atlas`](https://www.npmjs.com/package/taiwan-atlas)，由 `01_fetch_osm.py` 一併下載。
+
+## 授權
+
+- **程式碼**（`scripts/`、`.github/` 等）：採 [MIT License](LICENSE)。
+- **資料與產出**（`data/`、`output/`）：衍生自第三方資料，使用時須遵守各來源的授權：
+  - 道路網、交流道與醫院位置來自 OpenStreetMap，依 [ODbL](https://opendatacommons.org/licenses/odbl/) 授權，使用時須標示「© OpenStreetMap contributors」。
+  - 消防分隊點位（消防署）與急救責任醫院名單（衛福部）是政府開放資料，依 [政府資料開放授權條款](https://data.gov.tw/license) 使用。
+  - 縣市界來自 npm 套件 [`taiwan-atlas`](https://www.npmjs.com/package/taiwan-atlas)（MIT 授權）。
