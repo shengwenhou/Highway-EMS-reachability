@@ -87,6 +87,44 @@ ol.rank button:focus-visible { outline: 2px solid var(--accent); }
 .method ul { margin: 0; padding-left: 1.2em; color: var(--muted); font-size: 14px; display: grid; gap: 4px; }
 .method a { color: var(--accent); }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+
+/* ---- point query ---- */
+.query { display: grid; grid-template-columns: minmax(0, 320px) minmax(0, 1fr); gap: 20px; align-items: start; border: 1px solid var(--rule); border-radius: 10px; background: var(--surface); padding: 16px; }
+@media (max-width: 900px) { .query { grid-template-columns: minmax(0, 1fr); } }
+.query h2 { font-family: var(--font-display); font-size: 20px; margin: 0 0 4px; }
+.qform { display: grid; gap: 12px; }
+.qform label.f { display: grid; gap: 4px; font-size: 13px; color: var(--muted); }
+.qform select, .qform input[type=number] { font: inherit; font-size: 15px; color: var(--fg); background: var(--bg); border: 1px solid var(--rule); border-radius: 8px; padding: 8px 10px; width: 100%; }
+.qform select:focus-visible, .qform input:focus-visible, .qbtn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.qbtn { font: inherit; font-size: 14px; border: 1px solid var(--accent); background: var(--accent); color: var(--surface); border-radius: 8px; padding: 8px 14px; cursor: pointer; font-weight: 700; }
+.qbtn.ghost { background: transparent; color: var(--accent); }
+.qbtn[aria-pressed="true"] { background: var(--accent); color: var(--surface); }
+.qhint { font-size: 12px; color: var(--muted); min-height: 1.2em; }
+.qhint.err { color: var(--c3); font-weight: 700; }
+.qor { font-size: 12px; color: var(--muted); text-align: center; letter-spacing: .1em; }
+.choices { display: grid; gap: 6px; }
+.choices button { all: unset; box-sizing: border-box; cursor: pointer; border: 1px solid var(--rule); border-radius: 8px; padding: 8px 10px; font-size: 14px; background: var(--bg); }
+.choices button:hover, .choices button:focus-visible { border-color: var(--accent); outline: none; }
+.card { min-width: 0; display: grid; gap: 14px; }
+.card .empty { color: var(--muted); font-size: 14px; padding: 24px 0; }
+.card h3 { font-family: var(--font-display); font-size: 22px; margin: 0; }
+.card .sub { color: var(--muted); font-size: 13px; }
+.tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.tag { font-size: 12px; border: 1px solid var(--rule); border-radius: 99px; padding: 1px 8px; color: var(--muted); }
+.blocks { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+.blk { border: 1px solid var(--rule); border-radius: 8px; padding: 12px; display: grid; gap: 6px; min-width: 0; }
+.blk h4 { margin: 0; font-size: 15px; }
+.kv { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; font-size: 14px; align-items: baseline; }
+.kv .v { font-family: var(--font-data); font-variant-numeric: tabular-nums; font-weight: 500; }
+.lvl { font-size: 12px; font-weight: 700; padding: 0 6px; border-radius: 4px; color: var(--surface); }
+.note { font-size: 13px; color: var(--muted); }
+.note b { color: var(--fg); }
+.band { display: grid; grid-template-columns: repeat(31, 1fr); gap: 2px; margin-top: 4px; }
+.band span { height: 18px; border-radius: 2px; }
+.band span.here { outline: 2px solid var(--fg); outline-offset: 1px; }
+.bandaxis { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.warn { font-size: 14px; border-left: 3px solid var(--c3); padding: 4px 10px; background: var(--bg); border-radius: 0 6px 6px 0; }
+.warn.ok { border-left-color: var(--c0); }
 </style>
 
 <div class="wrap">
@@ -118,6 +156,32 @@ ol.rank button:focus-visible { outline: 2px solid var(--accent); }
     <label class="check"><input type="checkbox" id="show-stations"> 顯示消防分隊</label>
     <label class="check"><input type="checkbox" id="show-hospitals"> 顯示重度級醫院</label>
   </div>
+
+  <section class="query" aria-labelledby="q-title">
+    <div class="qform">
+      <div>
+        <h2 id="q-title">查詢點位</h2>
+        <div class="note">選國道、方向與公里數，或直接在地圖上點選國道。</div>
+      </div>
+      <label class="f" for="q-ref">國道
+        <select id="q-ref"></select>
+      </label>
+      <label class="f" for="q-dir">方向
+        <select id="q-dir"></select>
+      </label>
+      <label class="f" for="q-km">公里數（K）
+        <input id="q-km" type="number" inputmode="decimal" step="0.1" placeholder="例如 295">
+      </label>
+      <div class="qhint" id="q-hint" aria-live="polite"></div>
+      <button type="button" class="qbtn" id="q-go">查詢</button>
+      <div class="qor">或</div>
+      <button type="button" class="qbtn ghost" id="q-pick" aria-pressed="false">在地圖上點選</button>
+      <div class="choices" id="q-choices" aria-live="polite"></div>
+    </div>
+    <div class="card" id="q-card" aria-live="polite">
+      <div class="empty">查詢結果會顯示在這裡：救護反應與送醫的距離、時間和困難度，以及事故點前後的救護風險。</div>
+    </div>
+  </section>
 
   <div class="main">
     <div class="mapbox">
@@ -227,6 +291,7 @@ function drawRisk() {
   shown.forEach((r) => {
     r.line = L.polyline(r.ll, { renderer: canvas, color: css(RISK_VAR[r.risk]), weight: 4, lineCap: "butt", opacity: 1 })
       .bindPopup(() => riskPopup(r)).addTo(segLayer);
+    if (pickMode) r.line.unbindPopup();
   });
   document.getElementById("legend").innerHTML = `<div class="t">救護風險（被追撞）</div>` +
     `<div class="row"><span class="sw" style="background:${css("--c3")}"></span>紅：視距不足停車視距</div>` +
@@ -266,6 +331,7 @@ function draw() {
   shown.forEach((s) => {
     s.line = L.polyline(s.ll, { renderer: canvas, color: segColor(s), weight: isCross() && !s.cross ? 3 : 4, lineCap: "round", opacity: 1 })
       .bindPopup(() => popup(s)).addTo(segLayer);
+    if (pickMode) s.line.unbindPopup();
   });
   if (isCross()) {
     document.getElementById("legend").innerHTML = `<div class="t">最近分隊（行車距離）</div>` +
@@ -329,6 +395,207 @@ function drawRank() {
     });
     ol.appendChild(li);
   });
+}
+
+
+// ---------------- point query (all values precomputed; nothing is calculated on a server) ----------------
+const Q = DATA.query;
+const REF_ORDER = ["1", "2", "3", "3甲", "4", "5", "6", "8", "10"];
+const chainOf = new Int32Array(Q.km.length);
+Q.chains.forEach((c, ci) => { for (let i = c.i0; i <= c.i1; i++) chainOf[i] = ci; });
+const LIMIT = ["", "平面彎道", "縱坡坡頂", "資料起點"];
+const RISK_NAME = { 2: "紅", 1: "黃", 0: "綠", "-1": "資料不足" };
+const qRef = document.getElementById("q-ref"), qDir = document.getElementById("q-dir"), qKm = document.getElementById("q-km");
+const qHint = document.getElementById("q-hint"), qChoices = document.getElementById("q-choices"), qCard = document.getElementById("q-card");
+const qPick = document.getElementById("q-pick");
+const queryLayer = L.layerGroup().addTo(map);
+let pickMode = false;
+
+const refs = REF_ORDER.filter((r) => Q.chains.some((c) => c.ref === r));
+qRef.innerHTML = refs.map((r) => `<option value="${r}">國道 ${r} 號</option>`).join("");
+function mainChains(ref, d) { return Q.chains.filter((c) => c.ref === ref && c.kind === "main" && (!d || c.dir === d)); }
+function kmRange(ref, d) {
+  const cs = Q.chains.filter((c) => c.ref === ref && c.dir === d);
+  return [Math.max(0, Math.min(...cs.map((c) => c.km0))), Math.max(...cs.map((c) => c.km1))];
+}
+function fillDirs() {
+  const dirs = [...new Set(mainChains(qRef.value).map((c) => c.dir))];
+  qDir.innerHTML = dirs.map((d) => `<option value="${d}">${d}</option>`).join("");
+  showRangeHint();
+}
+function showRangeHint() {
+  const [a, b] = kmRange(qRef.value, qDir.value);
+  qKm.min = a.toFixed(1); qKm.max = b.toFixed(1);
+  qHint.className = "qhint";
+  qHint.textContent = `可輸入 ${a.toFixed(1)}–${b.toFixed(1)} K`;
+}
+qRef.addEventListener("change", fillDirs);
+qDir.addEventListener("change", showRangeHint);
+fillDirs();
+
+function nearestOnChain(ci, km) {
+  const c = Q.chains[ci];
+  let best = c.i0, bd = Infinity;
+  for (let i = c.i0; i <= c.i1; i++) { const d = Math.abs(Q.km[i] - km); if (d < bd) { bd = d; best = i; } }
+  return { i: best, err: bd };
+}
+function chainLabel(ci, i) {
+  const c = Q.chains[ci];
+  const road = Q.roads[Q.rn[i]] || c.name;
+  const elevated = /高架/.test(road);
+  return `國道${c.ref} ${c.dir}　${elevated ? road : (c.kind === "main" ? "主線" : road || "支線")}`;
+}
+function offerChoices(cands, title) {
+  qChoices.innerHTML = `<div class="note">${title}</div>` + cands.map((c, k) =>
+    `<button type="button" data-k="${k}">${chainLabel(c.ci, c.i)}　${Q.km[c.i].toFixed(1)}K</button>`).join("");
+  qChoices.querySelectorAll("button").forEach((b) => b.addEventListener("click", () => {
+    qChoices.innerHTML = ""; showResult(cands[+b.dataset.k].i);
+  }));
+}
+function runForm() {
+  qChoices.innerHTML = "";
+  const raw = qKm.value.trim();
+  const km = Number(raw);
+  const [a, b] = kmRange(qRef.value, qDir.value);
+  if (raw === "" || !Number.isFinite(km)) { qHint.className = "qhint err"; qHint.textContent = "請輸入公里數（數字），例如 295 或 295.3"; qKm.focus(); return; }
+  if (km < a - 0.05 || km > b + 0.05) { qHint.className = "qhint err"; qHint.textContent = `國道${qRef.value}號${qDir.value}只有 ${a.toFixed(1)}–${b.toFixed(1)} K，請重新輸入`; qKm.focus(); return; }
+  showRangeHint();
+  const cands = [];
+  Q.chains.forEach((c, ci) => {
+    if (c.ref !== qRef.value || c.dir !== qDir.value) return;
+    if (km < c.km0 - 0.15 || km > c.km1 + 0.15) return;
+    const n = nearestOnChain(ci, km);
+    if (n.err <= 0.15) cands.push({ ci, i: n.i, main: c.kind === "main" });
+  });
+  if (!cands.length) { qHint.className = "qhint err"; qHint.textContent = "這個公里數附近找不到車道資料，請換一個公里數"; return; }
+  cands.sort((x, y) => y.main - x.main);
+  if (cands.length === 1) showResult(cands[0].i);
+  else offerChoices(cands, "這個位置有平面與高架兩條車道，請選擇：");
+}
+document.getElementById("q-go").addEventListener("click", runForm);
+qKm.addEventListener("keydown", (e) => { if (e.key === "Enter") runForm(); });
+
+function setPick(on) {
+  pickMode = on;
+  qPick.setAttribute("aria-pressed", on);
+  qPick.textContent = on ? "請點地圖上的國道（再按一次取消）" : "在地圖上點選";
+  map.getContainer().style.cursor = on ? "crosshair" : "";
+  map.closePopup();
+  draw();
+  if (on) document.getElementById("map").scrollIntoView({ behavior: "smooth", block: "center" });
+}
+qPick.addEventListener("click", () => setPick(!pickMode));
+map.on("click", (e) => {
+  if (!pickMode) return;
+  const lat0 = e.latlng.lat, lon0 = e.latlng.lng, kx = Math.cos(lat0 * Math.PI / 180) * 111320, ky = 110540;
+  const best = new Map();
+  for (let i = 0; i < Q.km.length; i++) {
+    const dx = (Q.lon[i] - lon0) * kx, dy = (Q.lat[i] - lat0) * ky, d = dx * dx + dy * dy;
+    if (d > 600 * 600) continue;
+    const ci = chainOf[i];
+    if (!best.has(ci) || d < best.get(ci).d) best.set(ci, { ci, i, d });
+  }
+  setPick(false);
+  const cands = [...best.values()].sort((a, b) => a.d - b.d);
+  if (!cands.length) {
+    qChoices.innerHTML = `<div class="qhint err">這裡附近 600 m 內沒有國道，請點在國道上。</div>`; return;
+  }
+  offerChoices(cands, "請確認你要查詢的車道與方向：");
+  document.getElementById("q-title").scrollIntoView({ behavior: "smooth", block: "start" });
+});
+
+function level(p) {
+  if (p >= 90) return ["非常困難", "--c4"];
+  if (p >= 75) return ["困難", "--c3"];
+  if (p >= 50) return ["中等", "--c2"];
+  return ["較容易", "--c0"];
+}
+function pctLine(p, word) {
+  const [lv, col] = level(p);
+  return `<span class="lvl" style="background:${css(col)}">${lv}</span> 比全國 ${p}% 的國道點位${word}`;
+}
+function junctions(ci, i) {
+  const c = Q.chains[ci], s = Q.s[i];
+  let up = null, down = null;
+  c.junc.forEach((j) => { if (j[0] <= s && (!up || j[0] > up[0])) up = j; if (j[0] > s && (!down || j[0] < down[0])) down = j; });
+  return { up, down };
+}
+const jName = (j) => (j ? `${j[2]}（${j[1]}K）` : "無資料");
+function riskColor(r) { return css(RISK_VAR[r]); }
+
+function showResult(i) {
+  const ci = chainOf[i], c = Q.chains[ci];
+  const road = Q.roads[Q.rn[i]] || c.name;
+  const { up, down } = junctions(ci, i);
+  const county = Q.counties[Q.cy[i]];
+  const st = Q.stations[Q.sd[i]], stT = Q.stations[Q.st[i]];
+  const hs = Q.hospitals[Q.hs[i]], hsT = Q.hospitals[Q.hts[i]];
+  const stCounty = st.slice(0, 3);
+  const tags = [county, road, Q.b[i] ? "橋梁／高架" : "", Q.tu[i] ? "隧道" : ""].filter(Boolean);
+  // risk band: 2 km upstream (20 points) .. 1 km downstream (10 points), in travel order
+  const lo = Math.max(c.i0, i - 20), hi = Math.min(c.i1, i + 10);
+  const cells = [];
+  for (let k = i - 20; k <= i + 10; k++) {
+    const inRange = k >= lo && k <= hi;
+    const r = inRange ? Q.r[k] : -1;
+    cells.push(`<span class="${k === i ? "here" : ""}" title="${inRange ? Q.km[k].toFixed(1) + "K " + RISK_NAME[r] : "超出資料範圍"}" style="background:${inRange ? riskColor(r) : "transparent"}"></span>`);
+  }
+  // red stretches within the band
+  const warns = [];
+  let k = lo;
+  while (k <= hi) {
+    if (Q.r[k] === 2) {
+      let e = k; while (e + 1 <= hi && Q.r[e + 1] === 2) e++;
+      let minA = Infinity, lim = {};
+      for (let m = k; m <= e; m++) { minA = Math.min(minA, Q.a[m]); lim[Q.l[m]] = (lim[Q.l[m]] || 0) + 1; }
+      const why = LIMIT[+Object.keys(lim).sort((x, y) => lim[y] - lim[x])[0]] || "";
+      const kA = Math.min(Q.km[k], Q.km[e]).toFixed(1), kB = Math.max(Q.km[k], Q.km[e]).toFixed(1);
+      const where = e < i ? "上游" : k > i ? "下游" : "本點所在";
+      const dist = e < i ? `距本點約 ${((i - e) * 0.1).toFixed(1)} 公里` : k > i ? `距本點約 ${((k - i) * 0.1).toFixed(1)} 公里` : "";
+      warns.push(`<div class="warn"><b>${where} ${kA}–${kB}K 為紅色</b>（${why}，最短視距約 ${minA} m）${dist ? "，" + dist : ""}。` +
+        (where === "上游" ? "若實際事故位置比報案的公里數更偏向來車方向，救護車停在這一段時，後方來車可能來不及煞停。" :
+         where === "下游" ? "若實際位置更偏下游，停車處的後方視距不足。" : "救護車停在這裡時，後方來車可能來不及煞停。") + `</div>`);
+      k = e + 1;
+    } else k++;
+  }
+  if (!warns.length) warns.push(`<div class="warn ok">上游 2 公里到下游 1 公里內沒有紅色路段。</div>`);
+  const rHere = Q.r[i];
+  const riskHere = rHere < 0 ? "資料不足（位於資料起點附近，無法判斷）" :
+    `<b style="color:${riskColor(rHere)}">● ${RISK_NAME[rHere]}</b>　後方來車可在約 ${Q.a[i] >= 600 ? "600 m 以上" : Q.a[i] + " m"} 外看到救護車，所需停車視距約 ${Q.q[i]} m` +
+    (Q.l[i] && Q.a[i] < 600 ? `（視線受限於${LIMIT[Q.l[i]]}）` : "");
+  const kmA = Q.km[lo].toFixed(1), kmB = Q.km[hi].toFixed(1);
+  qCard.innerHTML = `
+    <div><h3>國道 ${c.ref} 號　${c.dir}　${Q.km[i].toFixed(1)}K</h3>
+      <div class="tags">${tags.map((t) => `<span class="tag">${t}</span>`).join("")}</div>
+      <div class="sub">上游交流道：${jName(up)}　下游交流道：${jName(down)}</div></div>
+    <div class="blocks">
+      <div class="blk"><h4>🚑 救護反應（消防分隊 → 事故點）</h4>
+        <div class="kv"><span>距離</span><span class="v">${Q.d[i].toFixed(1)} 公里</span><span></span><span>${pctLine(Q.pd[i], "遠")}</span>
+        <span>時間</span><span class="v">${Q.t[i].toFixed(1)} 分鐘</span><span></span><span>${pctLine(Q.pt[i], "久")}</span></div>
+        <div class="note">最近分隊：<b>${st}</b>${stT !== st ? `（以時間計為 ${stT}）` : ""}，需由上游交流道進入同方向車道${up ? `，最近的上游交流道為${jName(up)}` : ""}。</div>
+        <div class="note">${Q.x[i] ? `<b>跨區救護較近</b>：事故點在${county}，最近的分隊屬於${stCounty}。` : `同縣市救護（${county}）。`}</div>
+      </div>
+      <div class="blk"><h4>🏥 送醫（事故點 → 最近重度級醫院）</h4>
+        <div class="kv"><span>距離</span><span class="v">${Q.hd[i].toFixed(1)} 公里</span><span></span><span>${pctLine(Q.ph[i], "遠")}</span>
+        <span>時間</span><span class="v">${Q.ht[i].toFixed(1)} 分鐘</span><span></span><span>${pctLine(Q.pht[i], "久")}</span></div>
+        <div class="note">最近重度級急救責任醫院：<b>${hs}</b>${hsT !== hs ? `（以時間計為 ${hsT}）` : ""}。需沿${c.dir}方向開到下游${down ? "的" + jName(down) : "出口"}才能下交流道。</div>
+      </div>
+    </div>
+    <div class="blk"><h4>⚠️ 救護風險（救護車停在路上被追撞）</h4>
+      <div class="note">本點：${riskHere}</div>
+      <div class="note">事故點前後的風險帶（報案公里數可能不精確）：</div>
+      <div class="band" role="img" aria-label="上游 2 公里到下游 1 公里的救護風險">${cells.join("")}</div>
+      <div class="bandaxis"><span>← 上游（來車方向）${kmA}K</span><span>本點</span><span>${kmB}K 下游 →</span></div>
+      ${warns.join("")}
+    </div>
+    <div class="note">數值為 100 m 網格上的預先計算結果；困難度與全國約 2 萬個國道主線點位比較。</div>`;
+  queryLayer.clearLayers();
+  const band = [];
+  for (let m = lo; m <= hi; m++) band.push([Q.lat[m], Q.lon[m]]);
+  L.polyline(band, { color: css("--fg"), weight: 10, opacity: 0.25, interactive: false }).addTo(queryLayer);
+  L.circleMarker([Q.lat[i], Q.lon[i]], { radius: 9, weight: 3, color: css("--fg"), fillColor: css("--surface"), fillOpacity: 1, interactive: false }).addTo(queryLayer);
+  map.flyTo([Q.lat[i], Q.lon[i]], 13, { duration: 0.6 });
+  qCard.scrollIntoView({ behavior: "smooth", block: "nearest" });
 }
 
 const S = DATA.summary, MD = S.median;
