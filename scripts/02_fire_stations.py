@@ -1,7 +1,7 @@
 """Download and clean the national list of fire units (消防署「救援與應變單位點位」, data.gov.tw #5969).
 
-Keeps field units that dispatch ambulances (分隊 / 中隊); drops HQs, 大隊 offices and
-special search-and-rescue units. Output: data/fire_stations.csv (committed to the repo).
+Keeps field units that dispatch ambulances (分隊 / 中隊); drops HQs, 大隊 offices,
+special search-and-rescue units and harbour units. Output: data/fire_stations.csv (committed to the repo).
 """
 import io
 from pathlib import Path
@@ -26,6 +26,14 @@ MANUAL_COORDS = {
     "臺南市政府消防局將軍分隊": (120.1567366, 23.1998943),
 }
 EXCLUDE = ("特種", "特搜", "搜救救助", "訓練", "港務", "防災教育")
+# Harbour fire units (former port-authority brigades at Keelung, Taipei, Taichung, Su'ao and
+# Hualien ports). They serve the port areas and are not dispatched to freeway incidents.
+# Listed by exact name because many ordinary units also contain 港 (北港, 東港, 南港 ...).
+HARBOUR_UNITS = {
+    "蘇澳港分隊", "花蓮港分隊", "臺北港分隊",          # 蘇澳港、花蓮港、臺北港
+    "西岸分隊", "東岸分隊",                            # 基隆港
+    "西碼頭分隊", "防風林分隊", "南堤分隊", "第一分隊",  # 臺中港
+}
 
 
 def main() -> None:
@@ -59,7 +67,8 @@ def main() -> None:
         df.loc[metric, "x"], df.loc[metric, "y"] = lon, lat
     df = df.rename(columns={"x": "lon", "y": "lat"})
 
-    keep = df["name"].str.contains("分隊|中隊") & ~df["name"].str.contains("|".join(EXCLUDE))
+    keep = (df["name"].str.contains("分隊|中隊") & ~df["name"].str.contains("|".join(EXCLUDE))
+            & ~df["name"].isin(HARBOUR_UNITS))
     out = df[keep].copy()
     # Main island only.
     out = out[out.lon.between(119.95, 122.05) & out.lat.between(21.85, 25.35)]
