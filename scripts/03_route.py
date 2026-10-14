@@ -1,5 +1,6 @@
-"""Build a directed road graph, route from every fire station to every point of every
-national freeway carriageway, and summarise the result per 1-km segment.
+"""Build a directed road graph and, for every point of every national freeway carriageway,
+compute (a) the ambulance response from the nearest fire station and (b) the transport onward
+to the nearest heavy-level emergency hospital (重度級急救責任醫院). Summarise per 1-km segment.
 
 Model (see README for the full list of assumptions):
 - Ambulances follow one-way rules on every road class except residential / living_street.
@@ -7,6 +8,7 @@ Model (see README for the full list of assumptions):
   on-ramp. No U-turns across the median, no emergency gates.
 - Speeds = OSM maxspeed where tagged, otherwise a per-class default (free flow).
 - Distance-optimal and time-optimal routes are computed separately (two Dijkstra runs).
+- Transport leaves the point downstream along the same carriageway, to the next exit.
 
 Outputs (data/processed/):
   segments.geojson   one feature per carriageway x 1-km segment
@@ -315,21 +317,31 @@ def main():
     edges = edges[keep[edges.u.values] & keep[edges.v.values]].reset_index(drop=True)
     n = len(nodes)
 
-    # --- stations: snap to nearest non-freeway node of the giant SCC
-    st = pd.read_csv(ROOT / "data" / "fire_stations.csv")
-    sx, sy = to_m.transform(st.lon.values, st.lat.values)
+    # --- stations / hospitals: snap to nearest non-freeway node of the giant SCC
     hw_of_way = {w: ways[w]["tags"].get("highway") for w in edges.way.unique()}
     fw_nodes = set(edges.u[edges.way.map(hw_of_way).isin(["motorway", "motorway_link"])])
     cand = np.array([i for i in np.unique(edges.u) if i not in fw_nodes])
     tree = cKDTree(np.c_[nodes.x.values[cand], nodes.y.values[cand]])
-    d, k = tree.query(np.c_[sx, sy])
-    st["snap_node"] = cand[k]
-    st["snap_m"] = d
-    print("station snap distance (m):", st.snap_m.describe().round(1).to_dict())
 
+    def snap(df, what):
+        x, y = to_m.transform(df.lon.values, df.lat.values)
+        d, k = tree.query(np.c_[x, y])
+        df["snap_node"], df["snap_m"] = cand[k], d
+        print(f"{what} snap distance (m):", df.snap_m.describe().round(1).to_dict())
+
+    st = pd.read_csv(ROOT / "data" / "fire_stations.csv")
+    snap(st, "station")
     dist_m, lab_d = multi_source(edges, n, st.snap_node.values, st.snap_m.values, "len")
     time_s, lab_t = multi_source(edges, n, st.snap_node.values,
                                  st.snap_m.values / (SNAP_SPEED_KMH / 3.6), "sec")
+
+    # Transport: cost from every node TO the nearest hospital = Dijkstra on the reversed graph.
+    hp = pd.read_csv(ROOT / "data" / "heavy_er_hospitals.csv")
+    snap(hp, "hospital")
+    rev = edges.rename(columns={"u": "v", "v": "u"})
+    hdist_m, hlab_d = multi_source(rev, n, hp.snap_node.values, hp.snap_m.values, "len")
+    htime_s, hlab_t = multi_source(rev, n, hp.snap_node.values,
+                                   hp.snap_m.values / (SNAP_SPEED_KMH / 3.6), "sec")
 
     chains, mw = build_chains(ways, nodes, edges, keep)
     jkm = junction_km(ways, nodes)
@@ -375,6 +387,11 @@ def main():
         Dm = dist_m[tail] + off
         Ts = time_s[tail] + off / (kmh / 3.6)
         sd, stt = lab_d[tail], lab_t[tail]
+        head = p[ei + 1]
+        rem = smp["s"][ei + 1] - smp["ss"]
+        HDm = hdist_m[head] + rem
+        HTs = htime_s[head] + rem / (kmh / 3.6)
+        hd, ht = hlab_d[head], hlab_t[head]
         seg = np.clip(np.floor(km).astype(int), 0, None)
         lon_all, lat_all = to_ll.transform(smp["px"], smp["py"])
         for k in np.unique(seg):
@@ -383,6 +400,8 @@ def main():
                 continue
             iD = idx[np.argmax(Dm[idx])]
             iT = idx[np.argmax(Ts[idx])]
+            jD = idx[np.argmax(HDm[idx])]
+            jT = idx[np.argmax(HTs[idx])]
             # extend by one sample so consecutive segments join up on the map
             gidx = np.append(idx, idx[-1] + 1) if idx[-1] + 1 < len(km) else idx
             row = {
@@ -397,6 +416,13 @@ def main():
                 "worst_time_km_post": round(float(km[iT]), 1),
                 "max_time_min": round(float(Ts[iT]) / 60, 2),
                 "station_time": st.name[stt[iT]] if stt[iT] >= 0 else None,
+                "worst_hosp_km_post": round(float(km[jD]), 1),
+                "worst_hosp_lon": round(float(lon_all[jD]), 6),
+                "worst_hosp_lat": round(float(lat_all[jD]), 6),
+                "max_hosp_dist_km": round(float(HDm[jD]) / 1000, 2),
+                "hospital_dist": hp.name[hd[jD]] if hd[jD] >= 0 else None,
+                "max_hosp_time_min": round(float(HTs[jT]) / 60, 2),
+                "hospital_time": hp.name[ht[jT]] if ht[jT] >= 0 else None,
             }
             rows.append(row)
             feats.append({"type": "Feature", "properties": row, "geometry": {
@@ -411,6 +437,7 @@ def main():
     json.dump({"type": "FeatureCollection", "features": feats},
               open(OUT / "segments.geojson", "w"), ensure_ascii=False)
     st.to_csv(OUT / "stations_snapped.csv", index=False)
+    hp.to_csv(OUT / "hospitals_snapped.csv", index=False)
     print(df.describe())
 
 

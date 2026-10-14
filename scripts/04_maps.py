@@ -1,9 +1,11 @@
 """Make the deliverables from data/processed/segments.geojson:
 
-  output/map_distance.png      static map, coloured by ambulance travel distance
-  output/map_time.png          static map, coloured by ambulance travel time
-  output/segments.csv          every carriageway x 1-km segment
-  output/farthest_points.csv   local maxima (end of each stretch with no upstream on-ramp), ranked
+  output/map_distance.png           response: fire station -> point, distance
+  output/map_time.png               response: fire station -> point, time
+  output/map_hospital_distance.png  transport: point -> heavy-level emergency hospital, distance
+  output/map_hospital_time.png      transport: point -> heavy-level emergency hospital, time
+  output/segments.csv               every carriageway x 1-km segment
+  output/farthest_points.csv        local maxima per metric (worst point of each stretch), ranked
   output/index.html            interactive map (Leaflet), self-contained apart from the Leaflet script
 """
 import json
@@ -28,25 +30,41 @@ OUT.mkdir(exist_ok=True)
 COUNTY_TOPO = ROOT / "data" / "raw" / "county" / "package" / "counties-10t.json"
 LEAFLET_CSS = "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"
 
-# Fixed class breaks agreed for the project; green = close, purple = far.
-BINS = [5, 10, 15, 20]
+# Fixed class breaks; green = close, purple = far. Transport runs longer, so its breaks are wider.
 COLORS = ["#1f9e5a", "#d9b310", "#ec7a1c", "#d33a2c", "#7d3c98"]
+# key: (value column, unit, name, nearest-facility column, worst-point lon/lat prefix, bins)
 METRICS = {
-    "distance": ("max_dist_km", "公里", "反應距離", "station_dist"),
-    "time": ("max_time_min", "分鐘", "反應時間", "station_time"),
+    "distance": ("max_dist_km", "公里", "反應距離", "station_dist", "worst_dist", [5, 10, 15, 20]),
+    "time": ("max_time_min", "分鐘", "反應時間", "station_time", "worst_dist", [5, 10, 15, 20]),
+    "hospital_distance": ("max_hosp_dist_km", "公里", "送醫距離", "hospital_dist", "worst_hosp",
+                          [10, 20, 30, 40]),
+    "hospital_time": ("max_hosp_time_min", "分鐘", "送醫時間", "hospital_time", "worst_hosp",
+                      [10, 15, 20, 30]),
+}
+TITLES = {
+    "distance": "國道每公里路段：最近消防分隊救護車反應距離（取該公里段內最差點）",
+    "time": "國道每公里路段：最近消防分隊救護車反應時間（取該公里段內最差點）",
+    "hospital_distance": "國道每公里路段：送往最近重度級急救責任醫院的距離（取該公里段內最差點）",
+    "hospital_time": "國道每公里路段：送往最近重度級急救責任醫院的時間（取該公里段內最差點）",
+}
+NOTES = {
+    "response": "依車道方向計算，救護車只能由上游交流道進入；自由車流速度、不含出勤準備時間。"
+                "資料：OpenStreetMap、消防署救援單位點位",
+    "transport": "依車道方向計算，傷患須沿同方向車道開到下一個出口；自由車流速度、不含現場處置時間。"
+                 "資料：OpenStreetMap、衛福部急救責任醫院分區名單（115/4/29）",
 }
 DIR_GROUP = {"北上": "北上／東行", "東行": "北上／東行", "南下": "南下／西行", "西行": "南下／西行"}
 
 
-def bin_index(v):
-    return int(np.searchsorted(BINS, v, side="right"))
+def bin_index(v, bins):
+    return int(np.searchsorted(bins, v, side="right"))
 
 
-def bin_labels(unit):
-    edges = [0] + BINS
+def bin_labels(unit, bins):
+    edges = [0] + bins
     labels = [f"{a}–{b} {unit}" for a, b in zip(edges[:-1], edges[1:])]
-    labels.append(f"≥ {BINS[-1]} {unit}")
-    labels[0] = f"< {BINS[0]} {unit}"
+    labels.append(f"≥ {bins[-1]} {unit}")
+    labels[0] = f"< {bins[0]} {unit}"
     return labels
 
 
@@ -57,12 +75,14 @@ def load():
     counties = gpd.read_file(COUNTY_TOPO, layer="counties").set_crs(4326)
     counties = counties.cx[119.9:122.2, 21.8:25.4]
     stations = pd.read_csv(PROC / "stations_snapped.csv")
-    return seg, counties, stations
+    hospitals = pd.read_csv(PROC / "hospitals_snapped.csv")
+    return seg, counties, stations, hospitals
 
 
 def find_peaks(seg, col):
-    """A segment is a local peak if it is worse than the next one in the direction of travel:
-    that is where a stretch with no upstream on-ramp ends."""
+    """A segment is a local peak if it is worse than both neighbours along the carriageway:
+    for response that is the end of a stretch with no upstream on-ramp, for transport the
+    start of a stretch with no downstream exit."""
     out = []
     for _, g in seg.groupby("chain"):
         sign = 1 if g.km_from.iloc[-1] >= g.km_from.iloc[0] else -1
@@ -75,13 +95,13 @@ def find_peaks(seg, col):
 
 
 def static_map(seg, counties, metric):
-    col, unit, title, _ = METRICS[metric]
+    col, unit, title, _, wp, bins = METRICS[metric]
     fig, axes = plt.subplots(1, 2, figsize=(13, 11), dpi=150)
     for ax, grp in zip(axes, ["北上／東行", "南下／西行"]):
         counties.plot(ax=ax, color="#eef0ec", edgecolor="#b9beb6", linewidth=0.5)
         sub = seg[seg.direction.map(DIR_GROUP) == grp].sort_values(col)
         lines = [np.array(c) for c in sub.coords]
-        cols = [COLORS[bin_index(v)] for v in sub[col]]
+        cols = [COLORS[bin_index(v, bins)] for v in sub[col]]
         ax.add_collection(LineCollection(lines, colors=cols, linewidths=2.6, capstyle="round"))
         ax.set_xlim(119.95, 122.05)
         ax.set_ylim(21.85, 25.35)
@@ -90,7 +110,7 @@ def static_map(seg, counties, metric):
         ax.set_title(grp, fontsize=15)
         top = find_peaks(sub, col).sort_values(col, ascending=False).head(3)
         for rank, w in enumerate(top.itertuples(), 1):
-            xy = w.coords[-1]
+            xy = (getattr(w, wp + "_lon"), getattr(w, wp + "_lat"))
             right = xy[0] < 121.0
             ax.annotate(f"{rank}. 國道{w.ref} {w.direction} {w.km_from}K　{getattr(w, col):.1f} {unit}",
                         xy=xy, xytext=(-14 if not right else 14, 10 - 14 * rank), textcoords="offset points",
@@ -98,31 +118,35 @@ def static_map(seg, counties, metric):
                         bbox=dict(boxstyle="round,pad=0.25", fc="white", ec="#999", lw=0.5, alpha=0.9),
                         arrowprops=dict(arrowstyle="-", color="#444", lw=0.6))
             ax.plot(*xy, "o", ms=5, mfc="none", mec="#222", mew=1)
-    handles = [Patch(color=c, label=l) for c, l in zip(COLORS, bin_labels(unit))]
+    handles = [Patch(color=c, label=l) for c, l in zip(COLORS, bin_labels(unit, bins))]
     fig.legend(handles=handles, loc="lower center", ncol=5, frameon=False, fontsize=11)
-    fig.suptitle(f"國道每公里路段：最近消防分隊救護車{title}（取該公里段內最差點）", fontsize=17)
-    fig.text(0.5, 0.045, "依車道方向計算，救護車只能由上游交流道進入；自由車流速度、不含出勤準備時間。"
-             "資料：OpenStreetMap、消防署救援單位點位", ha="center", fontsize=9, color="#555")
+    fig.suptitle(TITLES[metric], fontsize=17)
+    fig.text(0.5, 0.045, NOTES["transport" if metric.startswith("hospital") else "response"],
+             ha="center", fontsize=9, color="#555")
     fig.subplots_adjust(left=0.02, right=0.98, top=0.92, bottom=0.08, wspace=0.02)
     fig.savefig(OUT / f"map_{metric}.png")
     plt.close(fig)
 
 
-def web_data(seg, counties, stations):
+def web_data(seg, counties, stations, hospitals):
     st_index = {n: i for i, n in enumerate(stations.name)}
+    hp_index = {n: i for i, n in enumerate(hospitals.name)}
     segs = []
     for r in seg.itertuples():
         segs.append([r.ref, r.direction, 1 if r.kind == "main" else 0, r.road_name, r.km_from,
                      r.max_dist_km, r.max_time_min,
                      st_index.get(r.station_dist, -1), st_index.get(r.station_time, -1),
+                     r.max_hosp_dist_km, r.max_hosp_time_min,
+                     hp_index.get(r.hospital_dist, -1), hp_index.get(r.hospital_time, -1),
                      [round(v, 5) for xy in r.coords for v in xy]])
     simp = counties.copy()
     simp["geometry"] = simp.geometry.simplify(0.003)
     county_gj = json.loads(simp[["COUNTYNAME", "geometry"]].to_json())
     for f in county_gj["features"]:
         f["geometry"]["coordinates"] = _round(f["geometry"]["coordinates"])
-    sts = [[n, round(lo, 5), round(la, 5)] for n, lo, la in zip(stations.name, stations.lon, stations.lat)]
-    return {"segments": segs, "counties": county_gj, "stations": sts}
+    pts = lambda df: [[n, round(lo, 5), round(la, 5)] for n, lo, la in zip(df.name, df.lon, df.lat)]
+    return {"segments": segs, "counties": county_gj, "stations": pts(stations),
+            "hospitals": pts(hospitals)}
 
 
 def _round(c):
@@ -132,35 +156,34 @@ def _round(c):
 
 
 def main():
-    seg, counties, stations = load()
+    seg, counties, stations, hospitals = load()
     for m in METRICS:
         static_map(seg, counties, m)
     seg.drop(columns="coords").to_csv(OUT / "segments.csv", index=False, encoding="utf-8-sig")
 
     peaks = []
-    for m, (col, unit, title, stcol) in METRICS.items():
+    for m, (col, unit, title, fcol, wp, _) in METRICS.items():
         p = find_peaks(seg, col).sort_values(col, ascending=False)
-        p = p.assign(metric=title, value=p[col], unit=unit, station=p[stcol],
-                     lon=p.worst_dist_lon, lat=p.worst_dist_lat)
+        p = p.assign(metric=title, value=p[col], unit=unit, nearest=p[fcol],
+                     lon=p[wp + "_lon"], lat=p[wp + "_lat"])
         peaks.append(p[["metric", "ref", "direction", "kind", "road_name", "km_from", "km_to",
-                        "value", "unit", "station", "lon", "lat"]])
+                        "value", "unit", "nearest", "lon", "lat"]])
     pk = pd.concat(peaks)
     pk.to_csv(OUT / "farthest_points.csv", index=False, encoding="utf-8-sig")
 
     css = subprocess.run(["curl", "-sSfL", LEAFLET_CSS], capture_output=True, text=True, check=True).stdout
-    data = web_data(seg, counties, stations)
+    data = web_data(seg, counties, stations, hospitals)
+    data["metrics"] = {m: {"name": v[2], "unit": v[1], "bins": v[5]} for m, v in METRICS.items()}
     data["peaks"] = {
-        m: [[r.ref, r.direction, r.road_name, r.km_from, r.value, r.station, r.lon, r.lat]
+        m: [[r.ref, r.direction, r.road_name, r.km_from, r.value, r.nearest, r.lon, r.lat]
             for r in pk[pk.metric == METRICS[m][2]].head(20).itertuples()]
         for m in METRICS}
+    main_seg = seg[seg.kind == "main"]
     data["summary"] = {
-        "segments": int(len(seg)),
-        "km_main": int((seg.kind == "main").sum()),
+        "km_main": int(len(main_seg)),
         "stations": int(len(stations)),
-        "median_dist": float(seg.max_dist_km.median()),
-        "median_time": float(seg.max_time_min.median()),
-        "share_over_10km": float((seg.max_dist_km >= 10).mean()),
-        "share_over_10min": float((seg.max_time_min >= 10).mean()),
+        "hospitals": int(len(hospitals)),
+        "median": {m: float(main_seg[v[0]].median()) for m, v in METRICS.items()},
     }
     tpl = (ROOT / "scripts" / "map_template.html").read_text()
     html = (tpl.replace("/*__LEAFLET_CSS__*/", css)
