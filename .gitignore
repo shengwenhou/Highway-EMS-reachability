@@ -2,3 +2,6 @@
 __pycache__/
 data/raw/
 data/processed/
+
+# local screenshots
+/page*.png
