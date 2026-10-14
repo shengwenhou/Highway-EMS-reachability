@@ -377,7 +377,8 @@ def main():
             else:
                 ch["km"], ch["km_source"] = smp["ss"] / 1000, "geometric"
 
-    rows, feats, samples = [], [], []
+    rows, feats, samples, chain_geo = [], [], [], []
+    r_speed = lambda t: parse_speed(t.get("maxspeed")) or 0
     for ci in order:
         ch = chains[ci]
         smp, km = ch["smp"], ch["km"]
@@ -395,9 +396,26 @@ def main():
         seg = np.clip(np.floor(km).astype(int), 0, None)
         lon_all, lat_all = to_ll.transform(smp["px"], smp["py"])
         samples.append(pd.DataFrame({
-            "chain": ci, "km_from": seg, "km": np.round(km, 2),
+            "chain": ci, "ref": ch["ref"], "direction": ch["direction"], "kind": ch["kind"],
+            "s_m": np.round(smp["ss"], 1), "km_from": seg, "km": np.round(km, 2),
             "lon": np.round(lon_all, 6), "lat": np.round(lat_all, 6),
-            "station_dist": st.name.values[sd], "station_time": st.name.values[stt]}))
+            "dist_km": np.round(Dm / 1000, 3), "station_dist": st.name.values[sd],
+            "time_min": np.round(Ts / 60, 3), "station_time": st.name.values[stt],
+            "hosp_dist_km": np.round(HDm / 1000, 3), "hospital_dist": hp.name.values[hd],
+            "hosp_time_min": np.round(HTs / 60, 3), "hospital_time": hp.name.values[ht]}))
+        # carriageway geometry for later analyses (sight distance etc.)
+        p_lon, p_lat = to_ll.transform(smp["x"], smp["y"])
+        flags = [ways[chain_way[(a, b)]]["tags"] if (a, b) in chain_way.index else {}
+                 for a, b in zip(p[:-1], p[1:])]
+        chain_geo.append({
+            "chain": ci, "ref": ch["ref"], "direction": ch["direction"], "kind": ch["kind"],
+            "name": ch["name"], "x": np.round(smp["x"], 2).tolist(), "y": np.round(smp["y"], 2).tolist(),
+            "lon": np.round(p_lon, 7).tolist(), "lat": np.round(p_lat, 7).tolist(),
+            "s": np.round(smp["s"], 2).tolist(),
+            "km": np.round(np.interp(smp["s"], smp["ss"], km), 3).tolist(),
+            "tunnel": [1 if t.get("tunnel") not in (None, "no") else 0 for t in flags],
+            "bridge": [1 if t.get("bridge") not in (None, "no") else 0 for t in flags],
+            "maxspeed": [r_speed(t) for t in flags]})
         for k in np.unique(seg):
             idx = np.flatnonzero(seg == k)
             if len(idx) < 2:
@@ -441,6 +459,7 @@ def main():
     json.dump({"type": "FeatureCollection", "features": feats},
               open(OUT / "segments.geojson", "w"), ensure_ascii=False)
     pd.concat(samples).to_csv(OUT / "samples.csv", index=False)
+    json.dump(chain_geo, open(OUT / "chains.json", "w"), ensure_ascii=False)
     st.to_csv(OUT / "stations_snapped.csv", index=False)
     hp.to_csv(OUT / "hospitals_snapped.csv", index=False)
     print(df.describe())

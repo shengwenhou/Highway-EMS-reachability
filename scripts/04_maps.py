@@ -6,11 +6,17 @@
   output/map_hospital_time.png      transport: point -> heavy-level emergency hospital, time
   output/map_cross_county.png       segments whose nearest fire station is in another county
   output/cross_county_segments.csv  those segments, with incident county and station county
+  output/map_risk.png               救護風險: sight distance to a stopped ambulance (red/yellow/green)
+  output/risk_red_stretches.csv     contiguous red stretches, longest first
+  output/points_100m.csv            every 100-m point with all metrics (response, transport,
+                                    county, cross-county, sight-distance risk)
+  output/sight_20m.csv              the full 20-m sight-distance profile
   output/segments.csv               every carriageway x 1-km segment
   output/farthest_points.csv        local maxima per metric (worst point of each stretch), ranked
   output/index.html            interactive map (Leaflet), self-contained apart from the Leaflet script
 """
 import json
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -120,7 +126,7 @@ def cross_county(seg, counties):
     cs = smp[smp.cross].groupby(["chain", "km_from"]).agg(
         cross_station=("station_dist", mode), cross_station_county=("station_county", mode))
     agg = agg.drop(columns="cross_station").join(cs)
-    return seg.merge(agg.reset_index(), on=["chain", "km_from"], how="left")
+    return seg.merge(agg.reset_index(), on=["chain", "km_from"], how="left"), smp
 
 
 def cross_runs(seg):
@@ -140,6 +146,61 @@ def cross_runs(seg):
                          "lon": r.worst_dist_lon.iloc[len(r) // 2],
                          "lat": r.worst_dist_lat.iloc[len(r) // 2]})
     return pd.DataFrame(runs).sort_values("length_km", ascending=False)
+
+
+RISK_COLORS = {2: "#d33a2c", 1: "#e0a800", 0: "#1f9e5a", -1: "#c9cdc6"}
+RISK_LABELS = {2: "紅：視距不足停車視距", 1: "黃：可停車但低於決策視距", 0: "綠：視距充足"}
+
+
+def risk_runs(points):
+    """Contiguous stretches of equal risk class along each carriageway (100-m resolution)."""
+    runs = []
+    for ci, g in points.sort_values(["chain", "s_m"]).groupby("chain"):
+        g = g.reset_index(drop=True)
+        cls = g.risk.fillna(-1).astype(int)
+        grp = (cls != cls.shift()).cumsum()
+        for _, r in g.groupby(grp):
+            i0, i1 = r.index[0], r.index[-1]
+            nxt = min(i1 + 1, len(g) - 1)
+            coords = [[float(a), float(b)] for a, b in zip(g.lon[i0:nxt + 1], g.lat[i0:nxt + 1])]
+            lim = r.limit.dropna()
+            runs.append({
+                "chain": ci, "ref": r.ref.iloc[0], "direction": r.direction.iloc[0],
+                "kind": r.kind.iloc[0], "risk": int(cls[i0]),
+                "km_start": round(float(r.km.min()), 1), "km_end": round(float(r.km.max()) + 0.1, 1),
+                "length_m": int(len(r) * 100), "min_asd_m": float(r.asd_m.min()) if r.asd_m.notna().any() else None,
+                "ssd_m": float(r.ssd_m.median()) if r.ssd_m.notna().any() else None,
+                "limit": lim.mode().iloc[0] if len(lim) else "",
+                "county": r.county.mode().iloc[0] if r.county.notna().any() else "",
+                "lon": float(r.lon.iloc[len(r) // 2]), "lat": float(r.lat.iloc[len(r) // 2]),
+                "coords": coords})
+    return pd.DataFrame(runs)
+
+
+def static_risk_map(runs, counties):
+    fig, axes = plt.subplots(1, 2, figsize=(13, 11), dpi=150)
+    for ax, grp in zip(axes, ["北上／東行", "南下／西行"]):
+        counties.plot(ax=ax, color="#eef0ec", edgecolor="#b9beb6", linewidth=0.5)
+        sub = runs[runs.direction.map(DIR_GROUP) == grp].sort_values("risk")
+        ax.add_collection(LineCollection([np.array(c) for c in sub.coords],
+                                         colors=[RISK_COLORS[r] for r in sub.risk],
+                                         linewidths=2.6, capstyle="butt"))
+        main = sub[sub.kind == "main"]
+        red_km = main[main.risk == 2].length_m.sum() / 1000
+        ax.set_xlim(119.95, 122.05)
+        ax.set_ylim(21.85, 25.35)
+        ax.set_aspect(1 / np.cos(np.radians(23.7)))
+        ax.set_axis_off()
+        ax.set_title(f"{grp}　主線紅色 {red_km:.0f} 公里", fontsize=15)
+    handles = [Patch(color=RISK_COLORS[k], label=v) for k, v in RISK_LABELS.items()]
+    fig.legend(handles=handles, loc="lower center", ncol=3, frameon=False, fontsize=11)
+    fig.suptitle("救護風險：救護車停在車道上時，後方 110 km/h 來車能否及時看見並煞停", fontsize=17)
+    fig.text(0.5, 0.045, "往上游回看的可用視距（平面彎道＋縱坡坡頂）對照停車視距與決策視距 335 m；"
+             "每 100 m 取最差點。高程：Copernicus GLO-30 DEM；線形：OpenStreetMap",
+             ha="center", fontsize=9, color="#555")
+    fig.subplots_adjust(left=0.02, right=0.98, top=0.92, bottom=0.08, wspace=0.02)
+    fig.savefig(OUT / "map_risk.png")
+    plt.close(fig)
 
 
 def static_cross_map(seg, counties, runs):
@@ -249,7 +310,18 @@ def main():
     seg, counties, stations, hospitals = load()
     for m in METRICS:
         static_map(seg, counties, m)
-    seg = cross_county(seg, counties)
+    seg, smp = cross_county(seg, counties)
+    risk = pd.read_csv(PROC / "risk_100m.csv")
+    points = smp.merge(risk, on=["chain", "s_m"], how="left")
+    points = points.rename(columns={"station_county": "station_dist_county",
+                                    "station_county_time": "station_time_county",
+                                    "cross": "cross_county_dist", "cross_time": "cross_county_time"})
+    points.to_csv(OUT / "points_100m.csv", index=False, encoding="utf-8-sig")
+    shutil.copy(PROC / "sight_20m.csv", OUT / "sight_20m.csv")
+    rruns = risk_runs(points)
+    static_risk_map(rruns, counties)
+    red = rruns[(rruns.risk == 2)].sort_values("length_m", ascending=False)
+    red.drop(columns="coords").to_csv(OUT / "risk_red_stretches.csv", index=False, encoding="utf-8-sig")
     runs = cross_runs(seg)
     static_cross_map(seg, counties, runs)
     seg.drop(columns="coords").to_csv(OUT / "segments.csv", index=False, encoding="utf-8-sig")
@@ -275,6 +347,13 @@ def main():
     data["cross"] = [1 if c else 0 for c in seg.cross_county]
     data["cross_runs"] = [[r.ref, r.direction, r.km_start, r.km_end, r.length_km, r.county,
                            r.station, r.station_county, r.lon, r.lat] for r in runs.itertuples()]
+    data["risk_runs"] = [[r.ref, r.direction, r.kind == "main", r.risk, r.km_start, r.km_end,
+                          r.length_m, r.min_asd_m, r.ssd_m, r.limit,
+                          [round(v, 5) for xy in r.coords for v in xy]] for r in rruns.itertuples()]
+    data["risk_red"] = [[r.ref, r.direction, r.km_start, r.km_end, r.length_m, r.min_asd_m,
+                         r.limit, r.county, r.lon, r.lat] for r in red[red.kind == "main"].head(30).itertuples()]
+    main_pts = points[points.kind == "main"]
+    data["risk_share"] = {k: float((main_pts.risk == k).mean()) for k in (0, 1, 2)}
     main_seg = seg[seg.kind == "main"]
     data["summary"] = {
         "km_main": int(len(main_seg)),

@@ -105,6 +105,7 @@ ol.rank button:focus-visible { outline: 2px solid var(--accent); }
         <button type="button" id="m-hdistance" data-metric="hospital_distance" aria-pressed="false">送醫距離</button>
         <button type="button" id="m-htime" data-metric="hospital_time" aria-pressed="false">送醫時間</button>
         <button type="button" id="m-cross" data-metric="cross" aria-pressed="false">跨區救護</button>
+        <button type="button" id="m-risk" data-metric="risk" aria-pressed="false">救護風險</button>
       </span>
     </div>
     <div><span class="ctl-label">方向</span>
@@ -139,6 +140,7 @@ ol.rank button:focus-visible { outline: 2px solid var(--accent); }
       <li>速度：OSM 速限標示，未標示者以道路等級預設（國道 100、快速道路 80、省道 60、縣道 50、市區 30–40 km/h），不計壅塞與出勤準備時間（約 1–1.5 分鐘需另加）。</li>
       <li>里程：以交流道編號（即里程）內插，誤差約 ±1 公里；五楊、汐五高架依平行主線里程標示。距離最短與時間最短可能來自不同分隊。</li>
       <li>送醫：衛福部「急救責任醫院分區名單」（更新日 115/4/29）中的重度級醫院 54 家；與兒童醫院合併評定者以成人醫院本院定位。傷患必須沿同方向開到下一個出口，再走一般道路，不含現場處置時間。</li>
+      <li>救護風險：每 20 m 假設一台救護車停在車道上，往上游回看後方駕駛最遠能在多遠看到它（平面彎道以路幅內 6 m 為視線範圍，縱坡以眼高 1.08 m、車身可見高度 1.0 m 計），對照時速 110 km/h 的停車視距（約 210–230 m，含反應 2.5 秒與縱坡修正）與決策視距 335 m。高程取自 Copernicus 30 m 地表模型，隧道與短高架橋以兩端內插、縱坡限制在 6% 內。未考慮護欄、隔音牆、邊坡與前方大車的遮蔽。</li>
       <li>未納入：國道 2 甲（OSM 中僅零星路段標為國道）。</li>
     </ul>
   </section>
@@ -152,11 +154,13 @@ const GROUP = { "北上": "北上／東行", "東行": "北上／東行", "南�
 const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
 const color = (v) => css("--c" + M[metric].bins.filter((b) => v >= b).length);
 const isCross = () => metric === "cross";
+const isRisk = () => metric === "risk";
+const RISK_VAR = { 2: "--c3", 1: "--c1", 0: "--c0", "-1": "--same" };
 const crossVar = (d) => (GROUP[d] === "北上／東行" ? "--cross-n" : "--cross-s");
 const fmt = (v, d = 1) => Number(v).toFixed(d);
 const isHosp = () => metric.startsWith("hospital");
 let metric = "distance", dir = "all";
-try { const m = localStorage.getItem("ems-metric"); if (m && (M[m] || m === "cross")) metric = m; } catch (e) {}
+try { const m = localStorage.getItem("ems-metric"); if (m && (M[m] || m === "cross" || m === "risk")) metric = m; } catch (e) {}
 
 const map = L.map("map", { zoomSnap: 0.25, preferCanvas: true, attributionControl: true })
   .fitBounds([[21.9, 120.0], [25.3, 122.0]]);
@@ -180,6 +184,19 @@ const segs = DATA.segments.map((s, i) => {
   return { ref, d, main, road, km, dist, time, sd, stt, hdist, htime, hd, ht, cross: DATA.cross[i], ll, line: null };
 });
 const segLayer = L.layerGroup().addTo(map);
+const riskRuns = DATA.risk_runs.map(([ref, d, main, risk, k0, k1, len, asd, ssd, limit, flat]) => {
+  const ll = [];
+  for (let i = 0; i < flat.length; i += 2) ll.push([flat[i + 1], flat[i]]);
+  return { ref, d, main, risk, k0, k1, len, asd, ssd, limit, ll };
+});
+function riskPopup(r) {
+  const name = { 2: "紅：視距不足停車視距", 1: "黃：可停車但低於決策視距", 0: "綠：視距充足", "-1": "資料不足" }[r.risk];
+  return `<div class="pop"><h3>國道${r.ref} ${r.d} ${fmt(r.k0)}K–${fmt(r.k1)}K</h3>` +
+    `<div><b>${name}</b></div>` +
+    (r.asd != null ? `<div>最短可用視距 <span class="v">${Math.round(r.asd)} m</span></div>` : "") +
+    (r.ssd != null ? `<div>所需停車視距 <span class="v">${Math.round(r.ssd)} m</span></div>` : "") +
+    (r.limit ? `<div class="s">視線受限於：${r.limit}</div>` : "") + `</div>`;
+}
 const canvas = L.canvas({ padding: 0.3, tolerance: 6 });
 
 function stName(i) { return i >= 0 ? DATA.stations[i][0] : "—"; }
@@ -205,8 +222,44 @@ function themeStatic() {
   hospitalLayer.eachLayer((m) => m.setStyle({ color: css("--fg"), fillColor: css("--surface") }));
 }
 
+function drawRisk() {
+  const shown = riskRuns.filter((r) => dir === "all" || GROUP[r.d] === dir).sort((a, b) => a.risk - b.risk);
+  shown.forEach((r) => {
+    r.line = L.polyline(r.ll, { renderer: canvas, color: css(RISK_VAR[r.risk]), weight: 4, lineCap: "butt", opacity: 1 })
+      .bindPopup(() => riskPopup(r)).addTo(segLayer);
+  });
+  document.getElementById("legend").innerHTML = `<div class="t">救護風險（被追撞）</div>` +
+    `<div class="row"><span class="sw" style="background:${css("--c3")}"></span>紅：視距不足停車視距</div>` +
+    `<div class="row"><span class="sw" style="background:${css("--c1")}"></span>黃：低於決策視距 335 m</div>` +
+    `<div class="row"><span class="sw" style="background:${css("--c0")}"></span>綠：視距充足</div>`;
+  drawRank();
+  document.querySelectorAll("[data-metric]").forEach((b) => b.setAttribute("aria-pressed", b.dataset.metric === metric));
+  document.querySelectorAll("[data-dir]").forEach((b) => b.setAttribute("aria-pressed", b.dataset.dir === dir));
+}
+
+function drawRiskRank() {
+  const list = DATA.risk_red.filter((p) => dir === "all" || GROUP[p[1]] === dir).slice(0, 20);
+  const sh = DATA.risk_share;
+  document.getElementById("rank-title").textContent = `紅色最長的 ${list.length} 段`;
+  document.getElementById("rank-note").textContent =
+    `主線每 100 m：紅 ${fmt(sh[2] * 100, 0)}%、黃 ${fmt(sh[1] * 100, 0)}%、綠 ${fmt(sh[0] * 100, 0)}%。救護車停在紅色路段時，後方 110 km/h 來車看到時已來不及煞停。點一下可在地圖上定位。`;
+  const ol = document.getElementById("rank");
+  ol.innerHTML = "";
+  list.forEach((p, i) => {
+    const [ref, d, k0, k1, len, asd, limit, county, lon, lat] = p;
+    const li = document.createElement("li");
+    li.innerHTML = `<button type="button"><span class="rk">${i + 1}</span>` +
+      `<span class="loc">國道${ref} ${d} ${fmt(k0)}K–${fmt(k1)}K <small>${county}</small></span>` +
+      `<span class="val"><span class="sw" style="background:${css("--c3")}"></span>${fmt(len / 1000)} 公里</span>` +
+      `<span class="st">最短視距 ${Math.round(asd)} m・${limit}</span></button>`;
+    li.querySelector("button").addEventListener("click", () => map.flyTo([lat, lon], 13, { duration: 0.6 }));
+    ol.appendChild(li);
+  });
+}
+
 function draw() {
   segLayer.clearLayers();
+  if (isRisk()) return drawRisk();
   const val = isCross() ? (s) => s.cross : VAL[metric];
   const segColor = isCross() ? (s) => css(s.cross ? crossVar(s.d) : "--same") : (s) => color(val(s));
   const shown = segs.filter((s) => dir === "all" || GROUP[s.d] === dir).sort((a, b) => val(a) - val(b));
@@ -252,6 +305,7 @@ function drawCrossRank() {
 
 function drawRank() {
   if (isCross()) return drawCrossRank();
+  if (isRisk()) return drawRiskRank();
   const list = DATA.peaks[metric].filter((p) => dir === "all" || GROUP[p[1]] === dir);
   document.getElementById("rank-title").textContent = `${M[metric].name}最${metric.endsWith("time") ? "久" : "遠"}的 ${list.length} 個點位`;
   document.getElementById("rank-note").textContent = isHosp()

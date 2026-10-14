@@ -9,3 +9,5 @@ networkx
 matplotlib
 osmium
 requests
+rasterio
+numba
