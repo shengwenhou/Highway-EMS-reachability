@@ -98,6 +98,7 @@ label.check { display: inline-flex; gap: 6px; align-items: center; font-size: 14
 .leaflet-bar a { background: var(--surface); color: var(--fg); border-color: var(--rule); }
 aside { display: grid; gap: 10px; min-width: 0; }
 aside h2 { font-family: var(--font-display); font-size: 20px; margin: 0; }
+#rank2-box { display: grid; gap: 8px; margin-top: 16px; }
 aside p.note { margin: 0; font-size: 13px; color: var(--muted); }
 ol.rank { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--rule); }
 ol.rank li { border-bottom: 1px solid var(--rule); }
@@ -221,9 +222,13 @@ ol.rank button:focus-visible { outline: 2px solid var(--accent); }
       <div class="legend" id="legend"></div>
     </div>
     <aside>
-      <h2 id="rank-title">最遠的 20 個點位</h2>
+      <h2 id="rank-title">反應距離最遠的 5 個點位</h2>
       <p class="note" id="rank-note"></p>
       <ol class="rank" id="rank"></ol>
+      <div id="rank2-box" hidden>
+        <h2 id="rank2-title"></h2>
+        <ol class="rank" id="rank2"></ol>
+      </div>
     </aside>
   </div>
 
@@ -376,15 +381,11 @@ function drawCrossRank() {
   });
 }
 
-function drawRank() {
-  if (isCross()) return drawCrossRank();
-  if (isRisk()) return drawRiskRank();
-  const list = DATA.peaks[metric].filter((p) => dir === "all" || GROUP[p[1]] === dir);
-  document.getElementById("rank-title").textContent = `${M[metric].name}最${metric.endsWith("time") ? "久" : "遠"}的 ${list.length} 個點位`;
-  document.getElementById("rank-note").textContent = isHosp()
-    ? "每個點位是一段「沒有下游出口」區間的起點（剛錯過出口），點一下可在地圖上定位。"
-    : "每個點位是一段「沒有上游入口」區間的終點，點一下可在地圖上定位。";
-  const ol = document.getElementById("rank");
+const RESPONSE = ["distance", "time"];
+function peakList(m, n) { return DATA.peaks[m].filter((p) => dir === "all" || GROUP[p[1]] === dir).slice(0, n); }
+function fillPeaks(ol, m, list) {
+  const hosp = m.startsWith("hospital");
+  const col = (v) => css("--c" + M[m].bins.filter((b) => v >= b).length);
   ol.innerHTML = "";
   list.forEach((p, i) => {
     const [ref, d, road, km, v, st, lon, lat] = p;
@@ -392,16 +393,36 @@ function drawRank() {
     const isBranch = road && !/高速公路|支線|環線|聯絡線/.test(road);
     li.innerHTML = `<button type="button"><span class="rk">${i + 1}</span>` +
       `<span class="loc">國道${ref} ${d} ${km}K ${isBranch ? `<small>${road}</small>` : ""}</span>` +
-      `<span class="val"><span class="sw" style="background:${color(v)}"></span>${fmt(v)} ${M[metric].unit}</span>` +
-      `<span class="st">${isHosp() ? "送往" : "最近"}：${st}</span></button>`;
+      `<span class="val"><span class="sw" style="background:${col(v)}"></span>${fmt(v)} ${M[m].unit}</span>` +
+      `<span class="st">${hosp ? "送往" : "最近"}：${st}</span></button>`;
     li.querySelector("button").addEventListener("click", () => {
-      map.flyTo([lat, lon], 12, { duration: 0.6 });
-      const s = segs.find((x) => x.ref === ref && x.d === d && x.km === km && x.line && x.road === road)
-        || segs.find((x) => x.ref === ref && x.d === d && x.km === km && x.line);
-      if (s) setTimeout(() => s.line.openPopup(), 650);
+      // same as clicking the map there: list the carriageways at this spot
+      map.flyTo([lat, lon], 13, { duration: 0.6 });
+      map.once("moveend", () => map.fire("click", { latlng: L.latLng(lat, lon) }));
     });
     ol.appendChild(li);
   });
+}
+const peakTitle = (m, n) => `${M[m].name}最${m.endsWith("time") ? "久" : "遠"}的 ${n} 個點位`;
+function drawRank() {
+  const box2 = document.getElementById("rank2-box");
+  box2.hidden = true;
+  if (isCross()) return drawCrossRank();
+  if (isRisk()) return drawRiskRank();
+  const pair = RESPONSE.includes(metric);
+  const first = pair ? "distance" : metric;
+  const list = peakList(first, pair ? 5 : 20);
+  document.getElementById("rank-title").textContent = peakTitle(first, list.length);
+  document.getElementById("rank-note").textContent = isHosp()
+    ? "每個點位是一段「沒有下游出口」區間的起點（剛錯過出口），點一下可在地圖上查看。"
+    : "每個點位是一段「沒有上游入口」區間的終點，點一下可在地圖上查看。";
+  fillPeaks(document.getElementById("rank"), first, list);
+  if (pair) {
+    const l2 = peakList("time", 5);
+    document.getElementById("rank2-title").textContent = peakTitle("time", l2.length);
+    fillPeaks(document.getElementById("rank2"), "time", l2);
+    box2.hidden = false;
+  }
 }
 
 
