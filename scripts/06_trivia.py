@@ -130,10 +130,10 @@ def build_cards(p, st, hp):
     i = m.hosp_dist_km.idxmax()
     r = p.loc[i]
     cards.append(dict(
-        tag="極端值", title="送醫極遠點", place=f"國道 {r.ref} 號{r.direction} {r.km:.1f}K（{r.county}，剛過水上系統）",
+        tag="極端值", title="送醫極遠點", place=f"國道 {r.ref} 號{r.direction} {r.km:.1f}K（{r.county}）",
         big=f"{r.hosp_dist_km:.1f}", unit="公里", sub=f"{r.hosp_time_min:.1f} 分鐘",
-        body="送到最近的重度級醫院（嘉義基督教醫院）最遠的點：剛錯過出口，要先往南開到約 22 公里外的柳營交流道"
-             "才能下去，再掉頭往北。此點取決於白河交流道沒有南下出口，見 VERIFY.md。",
+        body=f"送到最近的重度級醫院（{short(r.hospital_dist)}）最遠的點。埔里一帶沒有重度級醫院，"
+             "國 6 全線都要送到南投市；這個點又剛錯過出口，得先往東開到下一個交流道才能掉頭。",
         svg=dot(r.lon, r.lat), link=i))
 
     # 3 luckiest point: smallest response + transport time
