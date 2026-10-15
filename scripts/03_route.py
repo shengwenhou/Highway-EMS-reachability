@@ -226,6 +226,52 @@ def build_chains(ways, nodes, edges, keep):
     return chains, mw
 
 
+RAMP_SKIP = ("服務區", "休息站", "收費站", "緊急")   # not usable entrances/exits for this model
+
+
+def ramp_list(p, s, km, edges_out, edges_in, ways, jkm, nodes, branch):
+    """Entrance and exit ramps along a chain: [[s (m), km, name, "in"/"out"], ...].
+
+    Taken from the road graph itself (a motorway_link leaving or joining the chain), so it also
+    covers viaducts where OSM has few motorway_junction nodes. On a viaduct (branch chain), a
+    motorway merging in or splitting off part-way (e.g. 五股 traffic joining 汐五) counts too.
+    A ramp without a name takes the name of the nearest interchange node within 2.5 km."""
+    on = set(zip(p[:-1], p[1:]))
+    jn = [n for n in jkm if jkm[n][1]]
+    jx, jy = nodes.x.values[jn], nodes.y.values[jn]
+
+    def nearest_name(n):
+        d = np.hypot(jx - nodes.x.values[n], jy - nodes.y.values[n])
+        k = int(np.argmin(d)) if len(d) else -1
+        return jkm[jn[k]][1] if k >= 0 and d[k] < 2500 else ""
+
+    out = []
+    for i, n in enumerate(p):
+        for kind, table, other in (("out", edges_out, "v"), ("in", edges_in, "u")):
+            if n not in table:
+                continue
+            for e in table[n]:
+                pair = (n, e[other]) if kind == "out" else (e[other], n)
+                if pair in on:
+                    continue
+                t = ways[e["way"]]["tags"]
+                hw = t.get("highway")
+                transfer = hw == "motorway" and branch and 0 < i < len(p) - 1
+                if hw != "motorway_link" and not transfer:
+                    continue
+                name = "" if transfer else t.get("name", "")
+                name = name or nearest_name(n) or ("轉接道" if transfer else "未命名匝道")
+                if any(k in name for k in RAMP_SKIP):
+                    continue
+                out.append([round(float(s[i]), 1), round(float(km[i]), 1), name, kind])
+    out.sort()
+    dedup = []
+    for r in out:   # the same ramp can touch the chain at several consecutive nodes
+        if not any(d[2] == r[2] and d[3] == r[3] and abs(d[0] - r[0]) < 800 for d in dedup):
+            dedup.append(r)
+    return dedup
+
+
 def junction_km(ways, nodes):
     j = json.load(open(RAW / "osm_junctions.json"))["elements"]
     osm2i = dict(zip(nodes.osm_id.values, range(len(nodes))))
@@ -411,6 +457,15 @@ def main():
             else:
                 ch["km"], ch["km_source"] = smp["ss"] / 1000, "geometric"
 
+    # ramp lookup, limited to edges that touch a chain (indexing all 3.6 M edges is slow)
+    on_chain = np.zeros(len(nodes), bool)
+    for ch in chains:
+        on_chain[ch["smp"]["p"]] = True
+    near = edges[on_chain[edges.u.values] | on_chain[edges.v.values]]
+    eo, ei_ = {}, {}
+    for u, v, w in zip(near.u.values, near.v.values, near.way.values):
+        eo.setdefault(u, []).append({"v": v, "way": w})
+        ei_.setdefault(v, []).append({"u": u, "way": w})
     rows, feats, samples, chain_geo = [], [], [], []
     r_speed = lambda t: parse_speed(t.get("maxspeed")) or 0
     for ci in order:
@@ -454,7 +509,10 @@ def main():
             "maxspeed": [r_speed(t) for t in flags],
             # interchanges on this carriageway: [distance along chain (m), mileage, name]
             "junctions": [[round(float(smp["s"][i]), 1), jkm[n][0], jkm[n][1]]
-                          for i, n in enumerate(p) if n in jkm]})
+                          for i, n in enumerate(p) if n in jkm],
+            # entrance / exit ramps: [distance along chain (m), km on this chain, name, "in"/"out"]
+            "ramps": ramp_list(p, smp["s"], np.interp(smp["s"], smp["ss"], km), eo, ei_, ways, jkm, nodes,
+                               ch["kind"] == "branch")})
         for k in np.unique(seg):
             idx = np.flatnonzero(seg == k)
             if len(idx) < 2:

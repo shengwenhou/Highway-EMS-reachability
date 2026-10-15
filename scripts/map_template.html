@@ -545,10 +545,14 @@ function pctLine(p, word) {
 function junctions(ci, i) {
   const c = Q.chains[ci], s = Q.s[i];
   let up = null, down = null;
-  c.junc.forEach((j) => { if (j[0] <= s && (!up || j[0] > up[0])) up = j; if (j[0] > s && (!down || j[0] < down[0])) down = j; });
+  // nearest entrance behind the point (where an ambulance can get on) and exit ahead of it
+  c.junc.forEach((j) => {
+    if (j[3] === "in" && j[0] <= s && (!up || j[0] > up[0])) up = j;
+    if (j[3] === "out" && j[0] > s && (!down || j[0] < down[0])) down = j;
+  });
   return { up, down };
 }
-const jName = (j) => (j ? `${j[2]}（${j[1]}K）` : "無資料");
+const jName = (j) => (j ? `${j[2]}（${Number(j[1]).toFixed(1)}K）` : "無資料");
 function riskColor(r) { return css(RISK_VAR[r]); }
 
 function showResult(i) {
@@ -595,12 +599,12 @@ function showResult(i) {
   qCard.innerHTML = `
     <div><h3>國道 ${c.ref} 號　${c.dir}　${Q.km[i].toFixed(1)}K</h3>
       <div class="tags">${tags.map((t) => `<span class="tag">${t}</span>`).join("")}</div>
-      <div class="sub">上游交流道：${jName(up)}　下游交流道：${jName(down)}</div></div>
+      <div class="sub">上游最近入口：${jName(up)}　下游最近出口：${jName(down)}</div></div>
     <div class="blocks">
       <div class="blk"><h4>🚑 救護反應（消防分隊 → 事故點）</h4>
         <div class="kv"><span>距離</span><span class="v">${Q.d[i].toFixed(1)} 公里</span><span></span><span>${pctLine(Q.pd[i], "遠")}</span>
         <span>時間</span><span class="v">${Q.t[i].toFixed(1)} 分鐘</span><span></span><span>${pctLine(Q.pt[i], "久")}</span></div>
-        <div class="note">最近分隊：<b>${st}</b>${stT !== st ? `（以時間計為 ${stT}）` : ""}，需由上游交流道進入同方向車道${up ? `，最近的上游交流道為${jName(up)}` : ""}。</div>
+        <div class="note">最近分隊：<b>${st}</b>${stT !== st ? `（以時間計為 ${stT}）` : ""}，需由上游入口進入同方向車道${up ? `，最近的上游入口為${jName(up)}` : ""}。</div>
         <div class="note">${Q.x[i] ? `<b>跨區救護較近</b>：事故點在${county}，最近的分隊屬於${stCounty}。` : `同縣市救護（${county}）。`}</div>
       </div>
       <div class="blk"><h4>🏥 送醫（事故點 → 最近重度級醫院）</h4>
