@@ -15,6 +15,7 @@
   - 救護風險：`output/map_risk.png`，救護車停在車道上時被後車追撞的風險（紅／黃／綠）
 - 跨區救護路段清單：`output/cross_county_segments.csv`
 - 救護風險紅色路段清單：`output/risk_red_stretches.csv`
+- 冷知識圖卡：`output/trivia.html`，從資料挑出 14 件事，每則附位置示意圖，並可連到地圖查詢該點
 - **所有點位資料**（見下方「點位資料」）：`output/points_100m.csv`、`output/sight_20m.csv`
 - 每公里路段結果：`output/segments.csv`
 - 各指標的最遠點位排行：`output/farthest_points.csv`
@@ -237,6 +238,7 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt   # 另需 ap
 .venv/bin/python scripts/03_route.py          # 建圖、路徑計算 → data/processed/
 .venv/bin/python scripts/03b_sight.py         # 下載 Copernicus DEM、計算視距與救護風險
 .venv/bin/python scripts/04_maps.py           # 地圖與表格 → output/
+.venv/bin/python scripts/06_trivia.py         # 冷知識圖卡 → output/trivia.html
 .venv/bin/python scripts/05_trace.py 3 南下 301 hospital   # （選用）印出某一段的實際路線
 ```
 
