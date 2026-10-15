@@ -41,6 +41,10 @@ spec.loader.exec_module(r)
 ROADS = ("五股楊梅高架道路", "汐止五股高架道路")
 MIN_CHAIN_KM = 3.0          # skip short connector pieces
 CANDIDATE_RADIUS_KM = 15.0  # stations considered (straight line to the nearest viaduct point)
+# Reported practice for 五楊北上 (before 五股): 青埔 first, 隆恩 as 新北市's unit. Compared on the page.
+RULE_KM_FROM = 50.7         # just past the 機場系統 entrance merge (50.8K), the first entrance north of 中壢
+RULE_MARKS = [[70.9, "楊梅端"], [59.0, "中壢轉接道"], [50.8, "機場系統"], [35.0, "泰山轉接道"], [30.1, "五股"]]
+RULE_STATIONS = ("桃園市政府消防局青埔分隊", "新北市政府消防局隆恩分隊")
 TIME_LIMIT_S = 45 * 60
 SNAP_SPEED_KMH = r.SNAP_SPEED_KMH
 # categorical palette (dataviz reference, light / dark); assigned in order of appearance
@@ -101,7 +105,7 @@ def compute():
     lat0 = np.radians(vp.lat.mean())
     dx = (st.lon.values[:, None] - vp.lon.values[None, :]) * 111.32 * np.cos(lat0)
     dy = (st.lat.values[:, None] - vp.lat.values[None, :]) * 110.54
-    near = np.hypot(dx, dy).min(axis=1) <= CANDIDATE_RADIUS_KM
+    near = (np.hypot(dx, dy).min(axis=1) <= CANDIDATE_RADIUS_KM) | st.name.isin(RULE_STATIONS)
     cand = merge_colocated(st[near])
     print(f"{len(vp)} viaduct points, {len(cand)} candidate stations (co-located units merged)")
 
@@ -121,11 +125,23 @@ def compute():
     vp["margin_min"] = np.round(vp.second_min - vp.best_min, 2)
     vp["best_label"] = vp.best.map(label)
     vp["second_label"] = vp.second.map(label)
+    rank = np.argsort(order, axis=0) + 1          # 1 = fastest, per point
+    for nm in RULE_STATIONS:
+        k = int(np.flatnonzero(cand.name.values == nm)[0])
+        tag = short(nm).replace("分隊", "")
+        vp[f"t_{tag}"] = np.round(T[k] / 60, 2)
+        vp[f"rank_{tag}"] = rank[k]
+    ntp = np.flatnonzero(cand.name.str.startswith("新北市").values)
+    b_ntp = ntp[np.argmin(T[ntp], axis=0)]
+    vp["ntp_best_label"] = cand.label.values[b_ntp]
+    vp["ntp_best_min"] = np.round(T[b_ntp, cols] / 60, 2)
+    vp["n_cand"] = len(cand)
     agree = ((vp.best_min - vp.time_min).abs() <= 0.01).mean()
     print(f"fastest time agrees with the main analysis at {agree:.1%} of points")
     keepcols = ["chain", "direction", "road_name", "s_m", "km", "lon", "lat", "county",
                 "best", "best_label", "best_min", "second", "second_label", "second_min", "margin_min",
-                "station_dist", "dist_km"]
+                "station_dist", "dist_km", "t_青埔", "rank_青埔", "t_隆恩", "rank_隆恩",
+                "ntp_best_label", "ntp_best_min", "n_cand"]
     vp[keepcols].to_csv(PROC / "wuyang_points.csv", index=False)
     return vp[keepcols]
 
@@ -196,10 +212,31 @@ def static_map(vp, seg, cmap, counties, st, direction, fname):
     ax.set_axis_off()
     s_dir = seg[seg.direction == direction]
     ax.set_title(f"汐五・五楊高架 {direction}：反應時間最短的消防分隊", fontsize=17, pad=12)
-    ax.text(0.5, -0.04, "可跨縣市救護；虛線為縣市界。依 OpenStreetMap 匝道資料計算（北上高架入口待核對，見 VERIFY.md），不塞車。",
+    ax.text(0.5, -0.04, "可跨縣市救護；虛線為縣市界。依 OpenStreetMap 匝道資料計算（北上高架在機場系統到五股之間沒有入口，已查核），不塞車。",
              ha="center", fontsize=9.5, color="#555", transform=ax.transAxes)
     fig.savefig(OUT / fname, bbox_inches="tight", pad_inches=0.25)
     plt.close(fig)
+
+
+def rule_data(vp):
+    """Reported practice on 五楊北上 (青埔 first, 隆恩 for 新北市) against the model's fastest station."""
+    g = vp[(vp.direction == "北上") & (vp.road_name == "五股楊梅高架道路")].sort_values("km", ascending=False)
+    pts = [[round(r_.km, 1), r_.best_label, r_.best_min, r_.t_青埔, int(r_.rank_青埔), r_.t_隆恩, int(r_.rank_隆恩),
+            r_.ntp_best_label, r_.ntp_best_min] for r_ in g.itertuples()]
+    a = g[g.km <= RULE_KM_FROM]           # 機場系統 → 五股: the stretch the reported rule is about
+    summary = {
+        "km_from": RULE_KM_FROM, "km_to": round(float(a.km.min()), 1), "n_cand": int(vp.n_cand.iloc[0]),
+        "qp_gap": [round(float((a.t_青埔 - a.best_min).min()), 1), round(float((a.t_青埔 - a.best_min).max()), 1)],
+        "qp_rank": [int(a.rank_青埔.min()), int(a.rank_青埔.max())],
+        "qp_min": [round(float(a.t_青埔.min()), 1), round(float(a.t_青埔.max()), 1)],
+        "ln_gap": [round(float((a.t_隆恩 - a.t_青埔).min()), 1), round(float((a.t_隆恩 - a.t_青埔).max()), 1)],
+        "ln_rank": [int(a.rank_隆恩.min()), int(a.rank_隆恩.max())],
+        "ln_min": [round(float(a.t_隆恩.min()), 1), round(float(a.t_隆恩.max()), 1)],
+        "ntp_best": a.ntp_best_label.mode().iloc[0],
+        "ntp_gap": [round(float((a.t_隆恩 - a.ntp_best_min).min()), 1), round(float((a.t_隆恩 - a.ntp_best_min).max()), 1)],
+        "best": a.best_label.mode().iloc[0],
+    }
+    return {"rule": pts, "rule_summary": summary, "rule_marks": RULE_MARKS}
 
 
 def page(vp, seg, cmaps, counties, st):
@@ -225,6 +262,7 @@ def page(vp, seg, cmaps, counties, st):
                        for r_ in vp[vp.direction == d].sort_values(["chain", "s_m"]).itertuples()]
                    for d in ("北上", "南下")},
         "segments": json.loads(seg.to_json(orient="records", force_ascii=False)),
+        **rule_data(vp),
     }
     tpl = (ROOT / "scripts" / "wuyang_template.html").read_text()
     html = (tpl.replace("/*__LEAFLET_CSS__*/", css)

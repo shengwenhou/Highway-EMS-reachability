@@ -62,6 +62,22 @@ tr:last-child td { border-bottom: 0; }
 .stn { font-weight: 700; white-space: nowrap; }
 .small { font-size: 12px; color: var(--muted); }
 .tight { color: #b45309; font-weight: 700; }
+.chartbox { border: 1px solid var(--rule); border-radius: 10px; background: var(--surface); padding: 12px 12px 4px; position: relative; }
+.chartbox svg { display: block; width: 100%; height: auto; overflow: visible; }
+.chartbox .axis text, .chartbox .mk text { font-size: 11px; fill: var(--muted); font-family: var(--font-data); }
+.chartbox .grid line { stroke: var(--rule); stroke-width: 1; }
+.chartbox .mk line { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 3 3; }
+.chartbox .lab { font-size: 12px; font-weight: 700; fill: var(--fg); }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13px; margin: 0 0 6px; }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend i { width: 16px; height: 3px; border-radius: 2px; display: inline-block; }
+.tip { position: absolute; pointer-events: none; background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; padding: 6px 10px; font-size: 12.5px; box-shadow: 0 2px 8px rgba(0,0,0,.12); display: none; white-space: nowrap; }
+.tip b { font-family: var(--font-data); }
+.pc { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
+@media (min-width: 760px) { .pc { grid-template-columns: 1fr 1fr; } }
+.pc > div { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 12px 16px; }
+.pc h3 { margin: 0 0 4px; font-size: 16px; }
+.pc ul { margin: 0; padding-left: 1.2em; display: grid; gap: 6px; font-size: 14px; }
 footer { color: var(--muted); font-size: 13px; max-width: 80ch; display: grid; gap: 6px; border-top: 1px solid var(--rule); padding-top: 16px; }
 </style>
 </head>
@@ -72,7 +88,7 @@ footer { color: var(--muted); font-size: 13px; max-width: 80ch; display: grid; g
     <div class="eyebrow">國道 1 號高架路段 · 依行車方向 · 以反應時間計</div>
     <h1>汐五・五楊高架：誰的救護車最快到？</h1>
     <p class="lede">汐止五股高架與五股楊梅高架全長約 58 公里，跨越新北市、臺北市與桃園市。每 100 公尺一點，計算附近每個消防分隊開到該點的時間（必須從上游匝道上高架、不塞車），標出最快的分隊；並列出第二快的分隊與時間差，差距小的路段，換分隊出勤也只慢一點點。</p>
-    <div class="notice">北上高架在 OpenStreetMap 中，機場系統到五股之間沒有入口，所以北上大段由同一個分隊負責。這一點待核對（見 <a href="https://github.com/shengwenhou/Highway-EMS-reachability/blob/main/VERIFY.md">VERIFY.md</a>）；若實際有入口，北上的分工會明顯改變。</div>
+    <div class="notice">北上高架在機場系統到五股之間沒有任何入口（泰山轉接道北上只出不進，已查核，見 <a href="https://github.com/shengwenhou/Highway-EMS-reachability/blob/main/VERIFY.md">VERIFY.md</a>），所以不論哪個分隊，都得先繞到機場系統才能上高架，北上大段由同一個分隊負責。頁面下方另有<a href="#rule">實務派遣規則的對照</a>。</div>
   </header>
   <section id="north">
     <h2>北上（往汐止）</h2>
@@ -88,6 +104,21 @@ footer { color: var(--muted); font-size: 13px; max-width: 80ch; display: grid; g
     <div class="pair">
       <div class="mapbox"><div class="map" id="map-南下" aria-label="南下方向救護分工地圖"></div></div>
       <div class="tablebox"><table id="tbl-南下"></table></div>
+    </div>
+  </section>
+  <section id="rule">
+    <h2>對照實務派遣：北上五股前</h2>
+    <p class="dirnote">據了解，五楊高架北上（五股交流道前）的事故，第一優先派遣桃園市青埔分隊，新北市則以隆恩分隊為優先派遣單位。這是口頭得知的做法，尚未取得正式文件。下圖把這兩個分隊的到場時間，和模型算出的最快分隊並列（不塞車、不含出勤準備時間）。</p>
+    <div class="chartbox" id="rule-box">
+      <div class="legend" id="rule-legend"></div>
+      <svg id="rule-chart" role="img" aria-label="五楊高架北上各點的到場時間：最快分隊、青埔分隊、隆恩分隊"></svg>
+      <div class="tip" id="rule-tip"></div>
+    </div>
+    <p class="dirnote" id="rule-note"></p>
+    <div class="tablebox"><table id="tbl-rule"></table></div>
+    <div class="pc">
+      <div><h3>優點</h3><ul id="rule-pros"></ul></div>
+      <div><h3>缺點與限制</h3><ul id="rule-cons"></ul></div>
     </div>
   </section>
   <footer>
@@ -173,7 +204,110 @@ function retheme() {
     marks.forEach((m) => m.setStyle({ color: css("--surface"), fillColor: col(m.slot) }));
   });
   ["北上", "南下"].forEach(table);
+  ruleChart();
 }
+
+// ---- reported dispatch practice vs model (北上 五楊) ----
+const RS = D.rule_summary;
+const SER = [
+  { key: 2, name: "最快分隊（模型）", slot: 0 },
+  { key: 3, name: "青埔分隊（第一優先）", slot: 1 },
+  { key: 5, name: "隆恩分隊（新北市優先）", slot: 2 },
+];
+function ruleChart() {
+  const pts = D.rule, svg = document.getElementById("rule-chart"), box = document.getElementById("rule-box");
+  const W = Math.max(320, box.clientWidth - 24), H = Math.round(Math.min(360, Math.max(240, W * 0.45)));
+  const m = { l: 40, r: W < 520 ? 12 : 120, t: 22, b: 30 };
+  const kmMax = pts[0][0], kmMin = pts[pts.length - 1][0];
+  const yMax = Math.ceil(Math.max(...pts.map((p) => Math.max(p[2], p[3], p[5]))) / 5) * 5;
+  const X = (k) => m.l + (kmMax - k) / (kmMax - kmMin) * (W - m.l - m.r);
+  const Y = (v) => H - m.b - v / yMax * (H - m.t - m.b);
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  let g = `<g class="grid">`;
+  for (let v = 0; v <= yMax; v += 5) g += `<line x1="${m.l}" x2="${W - m.r}" y1="${Y(v)}" y2="${Y(v)}"/>`;
+  g += `</g><g class="axis">`;
+  for (let v = 0; v <= yMax; v += 5) g += `<text x="${m.l - 6}" y="${Y(v) + 4}" text-anchor="end">${v}</text>`;
+  g += `<text x="${m.l - 6}" y="${m.t - 8}" text-anchor="end">分鐘</text></g><g class="mk">`;
+  // axis labels: drop any that would overlap a neighbour, keeping the two ends
+  const labs = D.rule_marks.map(([k, n], i) => {
+    const x = X(k), w = n.length * 11 + 6, last = i === D.rule_marks.length - 1;
+    const anchor = i === 0 ? "start" : last ? "end" : "middle";
+    const left = anchor === "start" ? x : anchor === "end" ? x - w : x - w / 2;
+    g += `<line x1="${x}" x2="${x}" y1="${m.t}" y2="${H - m.b}"/>`;
+    return { x, n, anchor, left, right: left + w, keep: true };
+  });
+  const end = labs[labs.length - 1];
+  let prevRight = -Infinity;
+  labs.forEach((l, i) => {
+    if (i < labs.length - 1 && (l.left < prevRight || l.right > end.left)) { l.keep = false; return; }
+    prevRight = l.right;
+  });
+  labs.filter((l) => l.keep).forEach((l) => { g += `<text x="${l.x}" y="${H - m.b + 16}" text-anchor="${l.anchor}">${l.n}</text>`; });
+  g += `</g>`;
+  SER.forEach((s) => {
+    const d = pts.map((p, i) => `${i ? "L" : "M"}${X(p[0]).toFixed(1)},${Y(p[s.key]).toFixed(1)}`).join("");
+    g += `<path d="${d}" fill="none" stroke="${col(s.slot)}" stroke-width="2" stroke-linejoin="round"/>`;
+    if (W >= 520) {
+      const last = pts[pts.length - 1];
+      g += `<text class="lab" x="${X(last[0]) + 6}" y="${Y(last[s.key]) + 4}">${s.name.replace(/（.*/, "")}</text>`;
+    }
+  });
+  g += `<line id="rule-x" x1="0" x2="0" y1="${m.t}" y2="${H - m.b}" stroke="${css("--fg")}" stroke-width="1" opacity="0"/>`;
+  SER.forEach((s, i) => { g += `<circle id="rule-d${i}" r="4" fill="${col(s.slot)}" stroke="${css("--surface")}" stroke-width="2" opacity="0"/>`; });
+  g += `<rect x="${m.l}" y="${m.t}" width="${W - m.l - m.r}" height="${H - m.t - m.b}" fill="transparent" id="rule-hit"/>`;
+  svg.innerHTML = g;
+  document.getElementById("rule-legend").innerHTML = SER.map((s) => `<span><i style="background:${col(s.slot)}"></i>${s.name}</span>`).join("");
+  const tip = document.getElementById("rule-tip"), hit = document.getElementById("rule-hit");
+  const show = (ev) => {
+    const r = svg.getBoundingClientRect(), x = (ev.clientX - r.left) * W / r.width;
+    const k = kmMax - (x - m.l) / (W - m.l - m.r) * (kmMax - kmMin);
+    let best = 0;
+    pts.forEach((p, i) => { if (Math.abs(p[0] - k) < Math.abs(pts[best][0] - k)) best = i; });
+    const p = pts[best];
+    const cx = X(p[0]);
+    const xl = document.getElementById("rule-x");
+    xl.setAttribute("x1", cx); xl.setAttribute("x2", cx); xl.setAttribute("opacity", 0.35);
+    SER.forEach((s, i) => { const c = document.getElementById("rule-d" + i); c.setAttribute("cx", cx); c.setAttribute("cy", Y(p[s.key])); c.setAttribute("opacity", 1); });
+    tip.innerHTML = `<div><b>${p[0].toFixed(1)}K</b></div>` +
+      `<div>最快：${p[1]} <b>${p[2].toFixed(1)}</b> 分</div>` +
+      `<div>青埔：<b>${p[3].toFixed(1)}</b> 分（第 ${p[4]} 快）</div>` +
+      `<div>隆恩：<b>${p[5].toFixed(1)}</b> 分（第 ${p[6]} 快）</div>` +
+      `<div class="small">新北最快：${p[7]} ${p[8].toFixed(1)} 分</div>`;
+    tip.style.display = "block";
+    const bx = box.getBoundingClientRect(), px = cx / W * r.width + r.left - bx.left;
+    tip.style.left = Math.min(Math.max(8, px + 12), bx.width - tip.offsetWidth - 8) + "px";
+    tip.style.top = (r.top - bx.top + 30) + "px";
+  };
+  const hide = () => { tip.style.display = "none"; svg.querySelectorAll("#rule-x,[id^=rule-d]").forEach((e) => e.setAttribute("opacity", 0)); };
+  hit.addEventListener("pointermove", show); hit.addEventListener("pointerdown", show); hit.addEventListener("pointerleave", hide);
+}
+function ruleText() {
+  const rg = (a, u = "") => (a[0] === a[1] ? `${a[0]}${u}` : `${a[0]}–${a[1]}${u}`);
+  document.getElementById("rule-note").textContent =
+    `以下數字針對機場系統入口匯入點（約 ${RS.km_from}K）到五股（${RS.km_to}K）之間，也就是規則所指的路段；排名是在附近 ${RS.n_cand} 個分隊中的名次。`;
+  const pick = [RS.km_from, 45, 40, 35, RS.km_to];
+  const rows = pick.map((k) => D.rule.reduce((a, p) => (Math.abs(p[0] - k) < Math.abs(a[0] - k) ? p : a)));
+  document.getElementById("tbl-rule").innerHTML =
+    `<thead><tr><th>位置</th><th>最快分隊</th><th>青埔（第一優先）</th><th>隆恩（新北市優先）</th><th>新北市最快</th></tr></thead><tbody>` +
+    rows.map((p) => `<tr><td class="num">${p[0].toFixed(1)}K</td><td>${p[1]}<div class="small num">${p[2].toFixed(1)} 分</div></td>` +
+      `<td class="num">${p[3].toFixed(1)} 分<div class="small">第 ${p[4]} 快</div></td>` +
+      `<td class="num">${p[5].toFixed(1)} 分<div class="small">第 ${p[6]} 快</div></td>` +
+      `<td>${p[7]}<div class="small num">${p[8].toFixed(1)} 分</div></td></tr>`).join("") + `</tbody>`;
+  document.getElementById("rule-pros").innerHTML = [
+    `<b>第一優先選青埔，接近最快。</b>青埔在這一段比最快的${RS.best}慢 ${rg(RS.qp_gap)} 分鐘，名列第 ${rg(RS.qp_rank)} 快；前幾名彼此差距不大，而以距離計，這一段大多是青埔最近。`,
+    `<b>規則固定，派遣不必現場判斷。</b>高架封閉、只有機場系統一個入口，固定由同一分隊先出，可避免互相等待或重複出勤。`,
+    `<b>新北市派員有其必要。</b>約 39.5K 到五股之間屬新北市轄區，轄區單位到場可接手後續作業；大量傷患時也能補充救護車。`,
+    `<b>隆恩的路線單純。</b>隆恩分隊就在國 3 三鶯交流道旁，經國 3、鶯歌系統、國 2 接機場系統，全程走國道，較不受市區塞車影響。`,
+  ].map((t) => `<li>${t}</li>`).join("");
+  document.getElementById("rule-cons").innerHTML = [
+    `<b>隆恩到得很晚。</b>隆恩比青埔多花 ${rg(RS.ln_gap)} 分鐘（${rg(RS.ln_min, " 分")}），在附近分隊中只排第 ${rg(RS.ln_rank)}。若需要第二輛救護車，大園、中壢、復旦等桃園分隊在青埔之後 1–2 分鐘內就能到。`,
+    `<b>新北市內也不只隆恩一個選擇。</b>新北市分隊中模型最快的是${RS.ntp_best}，比隆恩快 ${rg(RS.ntp_gap)} 分鐘，差距在模型誤差範圍內；選隆恩可能另有考量（例如專責救護車或留守需求）。`,
+    `<b>越靠近五股越遠，規則改變不了。</b>所有分隊都要從機場系統上去，青埔到五股前的時間拉長到 ${RS.qp_min[1]} 分鐘。要縮短，得靠林口、泰山一帶讓救護車上北上高架的通道（本模型不使用緊急出入口）。`,
+    `<b>跨縣市派遣。</b>新北市轄區的事故由桃園市分隊先到，需要兩市的支援協定與通報流程配合。`,
+  ].map((t) => `<li>${t}</li>`).join("");
+}
+ruleText(); ruleChart();
+addEventListener("resize", () => { clearTimeout(window._rt); window._rt = setTimeout(ruleChart, 150); });
 matchMedia("(prefers-color-scheme: dark)").addEventListener("change", retheme);
 new MutationObserver(retheme).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
 </script>
