@@ -124,11 +124,10 @@ ol.rank button:focus-visible { outline: 2px solid var(--accent); }
 .qform select, .qform input[type=number] { font: inherit; font-size: 15px; color: var(--fg); background: var(--bg); border: 1px solid var(--rule); border-radius: 8px; padding: 8px 10px; width: 100%; }
 .qform select:focus-visible, .qform input:focus-visible, .qbtn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .qbtn { font: inherit; font-size: 14px; border: 1px solid var(--accent); background: var(--accent); color: var(--surface); border-radius: 8px; padding: 8px 14px; cursor: pointer; font-weight: 700; }
-.qbtn.ghost { background: transparent; color: var(--accent); }
 .qbtn[aria-pressed="true"] { background: var(--accent); color: var(--surface); }
 .qhint { font-size: 12px; color: var(--muted); min-height: 1.2em; }
 .qhint.err { color: var(--c3); font-weight: 700; }
-.qor { font-size: 12px; color: var(--muted); text-align: center; letter-spacing: .1em; }
+.h2note { font-family: var(--font-body); font-size: 13px; font-weight: 500; color: var(--muted); margin-left: 4px; }
 .choices { display: grid; gap: 6px; }
 .choices button { all: unset; box-sizing: border-box; cursor: pointer; border: 1px solid var(--rule); border-radius: 8px; padding: 8px 10px; font-size: 14px; background: var(--bg); }
 .choices button:hover, .choices button:focus-visible { border-color: var(--accent); outline: none; }
@@ -192,8 +191,8 @@ ol.rank button:focus-visible { outline: 2px solid var(--accent); }
   <section class="query" aria-labelledby="q-title">
     <div class="qform">
       <div>
-        <h2 id="q-title">查詢點位</h2>
-        <div class="note">選國道、方向與公里數（國道 1 號可另選汐五、五楊高架），或直接在地圖上點選國道。</div>
+        <h2 id="q-title">查詢點位<span class="h2note">（亦可直接在地圖上點選）</span></h2>
+        <div class="note">選國道、方向與公里數（國道 1 號可另選汐五、五楊高架）。</div>
       </div>
       <label class="f" for="q-ref">國道
         <select id="q-ref"></select>
@@ -209,8 +208,6 @@ ol.rank button:focus-visible { outline: 2px solid var(--accent); }
       </label>
       <div class="qhint" id="q-hint" aria-live="polite"></div>
       <button type="button" class="qbtn" id="q-go">查詢</button>
-      <div class="qor">或</div>
-      <button type="button" class="qbtn ghost" id="q-pick" aria-pressed="false">在地圖上點選</button>
       <div class="choices" id="q-choices" aria-live="polite"></div>
     </div>
     <div class="card" id="q-card" aria-live="polite">
@@ -288,32 +285,9 @@ const riskRuns = DATA.risk_runs.map(([ref, d, main, risk, k0, k1, len, asd, ssd,
   for (let i = 0; i < flat.length; i += 2) ll.push([flat[i + 1], flat[i]]);
   return { ref, d, main, risk, k0, k1, len, asd, ssd, limit, ll };
 });
-function riskPopup(r) {
-  const name = { 2: "紅：視距不足停車視距", 1: "黃：可停車但低於決策視距", 0: "綠：視距充足", "-1": "資料不足" }[r.risk];
-  return `<div class="pop"><h3>國道${r.ref} ${r.d} ${fmt(r.k0)}K–${fmt(r.k1)}K</h3>` +
-    `<div><b>${name}</b></div>` +
-    (r.asd != null ? `<div>最短可用視距 <span class="v">${Math.round(r.asd)} m</span></div>` : "") +
-    (r.ssd != null ? `<div>所需停車視距 <span class="v">${Math.round(r.ssd)} m</span></div>` : "") +
-    (r.limit ? `<div class="s">視線受限於：${r.limit}</div>` : "") + `</div>`;
-}
 const canvas = L.canvas({ padding: 0.3, tolerance: 6 });
 
-function stName(i) { return i >= 0 ? DATA.stations[i][0] : "—"; }
-function hpName(i) { return i >= 0 ? DATA.hospitals[i][0] : "—"; }
 const VAL = { distance: (s) => s.dist, time: (s) => s.time, hospital_distance: (s) => s.hdist, hospital_time: (s) => s.htime };
-function popup(s) {
-  return `<div class="pop"><h3>國道${s.ref} ${s.d} ${s.km}K–${s.km + 1}K</h3>` +
-    (s.main ? "" : `<div class="s">${s.road}</div>`) +
-    `<div>反應距離 <span class="v">${fmt(s.dist)} 公里</span></div>` +
-    `<div class="s">${stName(s.sd)}</div>` +
-    `<div>反應時間 <span class="v">${fmt(s.time)} 分鐘</span></div>` +
-    `<div class="s">${stName(s.stt)}</div>` +
-    `<div>送醫距離 <span class="v">${fmt(s.hdist)} 公里</span></div>` +
-    `<div class="s">${hpName(s.hd)}</div>` +
-    `<div>送醫時間 <span class="v">${fmt(s.htime)} 分鐘</span></div>` +
-    `<div class="s">${hpName(s.ht)}</div>` +
-    (s.cross ? `<div><b>跨區救護較近</b></div>` : "") + `</div>`;
-}
 
 function themeStatic() {
   countyLayer.setStyle({ color: css("--land-edge"), weight: 0.8, fillColor: css("--land"), fillOpacity: 1 });
@@ -325,8 +299,7 @@ function drawRisk() {
   const shown = riskRuns.filter((r) => dir === "all" || GROUP[r.d] === dir).sort((a, b) => a.risk - b.risk);
   shown.forEach((r) => {
     r.line = L.polyline(r.ll, { renderer: canvas, color: css(RISK_VAR[r.risk]), weight: 4, lineCap: "butt", opacity: 1 })
-      .bindPopup(() => riskPopup(r)).addTo(segLayer);
-    if (pickMode) r.line.unbindPopup();
+      .addTo(segLayer);
   });
   document.getElementById("legend").innerHTML = `<div class="t">救護風險（被追撞）</div>` +
     `<div class="row"><span class="sw" style="background:${css("--c3")}"></span>紅：視距不足停車視距</div>` +
@@ -365,8 +338,7 @@ function draw() {
   const shown = segs.filter((s) => dir === "all" || GROUP[s.d] === dir).sort((a, b) => val(a) - val(b));
   shown.forEach((s) => {
     s.line = L.polyline(s.ll, { renderer: canvas, color: segColor(s), weight: isCross() && !s.cross ? 3 : 4, lineCap: "round", opacity: 1 })
-      .bindPopup(() => popup(s)).addTo(segLayer);
-    if (pickMode) s.line.unbindPopup();
+      .addTo(segLayer);
   });
   if (isCross()) {
     document.getElementById("legend").innerHTML = `<div class="t">最近分隊（行車距離）</div>` +
@@ -442,9 +414,7 @@ const LIMIT = ["", "平面彎道", "縱坡坡頂", "資料起點"];
 const RISK_NAME = { 2: "紅", 1: "黃", 0: "綠", "-1": "資料不足" };
 const qRef = document.getElementById("q-ref"), qDir = document.getElementById("q-dir"), qKm = document.getElementById("q-km");
 const qHint = document.getElementById("q-hint"), qChoices = document.getElementById("q-choices"), qCard = document.getElementById("q-card");
-const qPick = document.getElementById("q-pick");
 const queryLayer = L.layerGroup().addTo(map);
-let pickMode = false;
 
 const qRoad = document.getElementById("q-road"), qRoadWrap = document.getElementById("q-road-wrap");
 const GROUND = "平面主線";
@@ -510,36 +480,29 @@ function runForm() {
 document.getElementById("q-go").addEventListener("click", runForm);
 qKm.addEventListener("keydown", (e) => { if (e.key === "Enter") runForm(); });
 
-function setPick(on) {
-  pickMode = on;
-  qPick.setAttribute("aria-pressed", on);
-  qPick.textContent = on ? "請點地圖上的國道（再按一次取消）" : "在地圖上點選";
-  map.getContainer().style.cursor = on ? "crosshair" : "";
-  map.closePopup();
-  draw();
-  if (on) document.getElementById("map").scrollIntoView({ behavior: "smooth", block: "center" });
-}
-qPick.addEventListener("click", () => setPick(!pickMode));
+// any click on the map lists the carriageways at that spot (no separate pick mode)
 map.on("click", (e) => {
-  if (!pickMode) return;
   const lat0 = e.latlng.lat, lon0 = e.latlng.lng, kx = Math.cos(lat0 * Math.PI / 180) * 111320, ky = 110540;
+  // search radius: 600 m, or about 15 screen pixels when zoomed out so a click near a line still hits
+  const mpp = 40075016 * Math.cos(lat0 * Math.PI / 180) / (256 * 2 ** map.getZoom());
+  const R = Math.max(600, 15 * mpp);
   const best = new Map();
   for (let i = 0; i < Q.km.length; i++) {
     const dx = (Q.lon[i] - lon0) * kx, dy = (Q.lat[i] - lat0) * ky, d = dx * dx + dy * dy;
-    if (d > 600 * 600) continue;
+    if (d > R * R) continue;
     const ci = chainOf[i];
     if (!best.has(ci) || d < best.get(ci).d) best.set(ci, { ci, i, d });
   }
-  setPick(false);
   let cands = [...best.values()];
   if (!cands.length) {
-    qChoices.innerHTML = `<div class="qhint err">這裡附近 600 m 內沒有國道，請點在國道上。</div>`; return;
+    L.popup({ maxWidth: 240 }).setLatLng(e.latlng)
+      .setContent(`<div class="cmp-n">這裡附近沒有國道，請點在國道上；或用上方的「查詢點位」選國道與公里數。</div>`).openOn(map);
+    return;
   }
   // a click cannot tell the carriageways apart (they are tens of metres apart, viaducts sit on top
   // of the ground road), so list every carriageway at this spot and let the user compare
   const dmin = Math.sqrt(Math.min(...cands.map((c) => c.d)));
   cands = cands.filter((c) => Math.sqrt(c.d) <= dmin + 250);
-  qChoices.innerHTML = "";
   showCompare(e.latlng, cands);
 });
 
@@ -603,7 +566,17 @@ function junctions(ci, i) {
 const jName = (j) => (j ? `${j[2]}（${Number(j[1]).toFixed(1)}K）` : "無資料");
 function riskColor(r) { return css(RISK_VAR[r]); }
 
+function syncForm(i) {
+  // keep the form in step with whatever is shown (map click, ranking link, #pt- link)
+  const c = Q.chains[chainOf[i]], road = Q.roads[Q.rn[i]] || c.name;
+  if (qRef.value !== c.ref) { qRef.value = c.ref; fillDirs(); }
+  if (qDir.value !== c.dir) { qDir.value = c.dir; fillRoads(); }
+  qRoad.value = isElevated(road) ? routeName(road) : GROUND;
+  showRangeHint();
+  qKm.value = Q.km[i].toFixed(1);
+}
 function showResult(i) {
+  syncForm(i);
   const ci = chainOf[i], c = Q.chains[ci];
   const road = Q.roads[Q.rn[i]] || c.name;
   const { up, down } = junctions(ci, i);
