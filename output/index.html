@@ -98,7 +98,6 @@ label.check { display: inline-flex; gap: 6px; align-items: center; font-size: 14
 .leaflet-bar a { background: var(--surface); color: var(--fg); border-color: var(--rule); }
 aside { display: grid; gap: 10px; min-width: 0; }
 aside h2 { font-family: var(--font-display); font-size: 20px; margin: 0; }
-#rank2-box { display: grid; gap: 8px; margin-top: 16px; }
 aside p.note { margin: 0; font-size: 13px; color: var(--muted); }
 ol.rank { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--rule); }
 ol.rank li { border-bottom: 1px solid var(--rule); }
@@ -222,13 +221,9 @@ ol.rank button:focus-visible { outline: 2px solid var(--accent); }
       <div class="legend" id="legend"></div>
     </div>
     <aside>
-      <h2 id="rank-title">反應距離最遠的 5 個點位</h2>
+      <h2 id="rank-title">反應距離最遠的 10 個點位</h2>
       <p class="note" id="rank-note"></p>
       <ol class="rank" id="rank"></ol>
-      <div id="rank2-box" hidden>
-        <h2 id="rank2-title"></h2>
-        <ol class="rank" id="rank2"></ol>
-      </div>
     </aside>
   </div>
 
@@ -316,7 +311,7 @@ function drawRisk() {
 }
 
 function drawRiskRank() {
-  const list = DATA.risk_red.filter((p) => dir === "all" || GROUP[p[1]] === dir).slice(0, 20);
+  const list = DATA.risk_red.filter((p) => dir === "all" || GROUP[p[1]] === dir).slice(0, RANK_N);
   const sh = DATA.risk_share;
   document.getElementById("rank-title").textContent = `紅色最長的 ${list.length} 段`;
   document.getElementById("rank-note").textContent =
@@ -362,7 +357,7 @@ function draw() {
 }
 
 function drawCrossRank() {
-  const list = DATA.cross_runs.filter((p) => dir === "all" || GROUP[p[1]] === dir).slice(0, 20);
+  const list = DATA.cross_runs.filter((p) => dir === "all" || GROUP[p[1]] === dir).slice(0, RANK_N);
   document.getElementById("rank-title").textContent = `跨區救護較近的最長 ${list.length} 段`;
   document.getElementById("rank-note").textContent =
     `主線 ${DATA.summary.cross_main} 個公里段（雙向）由鄰近縣市的分隊救護較近。依連續長度排序，點一下可在地圖上定位。`;
@@ -381,7 +376,7 @@ function drawCrossRank() {
   });
 }
 
-const RESPONSE = ["distance", "time"];
+const RANK_N = 10;   // every ranking in the side panel lists the top 10 of the current mode
 function peakList(m, n) { return DATA.peaks[m].filter((p) => dir === "all" || GROUP[p[1]] === dir).slice(0, n); }
 function fillPeaks(ol, m, list) {
   const hosp = m.startsWith("hospital");
@@ -405,24 +400,14 @@ function fillPeaks(ol, m, list) {
 }
 const peakTitle = (m, n) => `${M[m].name}最${m.endsWith("time") ? "久" : "遠"}的 ${n} 個點位`;
 function drawRank() {
-  const box2 = document.getElementById("rank2-box");
-  box2.hidden = true;
   if (isCross()) return drawCrossRank();
   if (isRisk()) return drawRiskRank();
-  const pair = RESPONSE.includes(metric);
-  const first = pair ? "distance" : metric;
-  const list = peakList(first, pair ? 5 : 20);
-  document.getElementById("rank-title").textContent = peakTitle(first, list.length);
+  const list = peakList(metric, RANK_N);
+  document.getElementById("rank-title").textContent = peakTitle(metric, list.length);
   document.getElementById("rank-note").textContent = isHosp()
     ? "每個點位是一段「沒有下游出口」區間的起點（剛錯過出口），點一下可在地圖上查看。"
     : "每個點位是一段「沒有上游入口」區間的終點，點一下可在地圖上查看。";
-  fillPeaks(document.getElementById("rank"), first, list);
-  if (pair) {
-    const l2 = peakList("time", 5);
-    document.getElementById("rank2-title").textContent = peakTitle("time", l2.length);
-    fillPeaks(document.getElementById("rank2"), "time", l2);
-    box2.hidden = false;
-  }
+  fillPeaks(document.getElementById("rank"), metric, list);
 }
 
 
