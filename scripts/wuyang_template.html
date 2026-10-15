@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>汐五・五楊高架救護分工</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@700;900&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/*__LEAFLET_CSS__*/
+/* Layout: the atlas-sheet identity of the main map; one section per direction, each a map
+   beside its responsibility table (stacked on phones). */
+:root {
+  --bg: #f5f6f2; --surface: #ffffff; --land: #e7eae3; --land-edge: #7d857b;
+  --fg: #1e2420; --muted: #5d665f; --rule: #d6dbd3; --accent: #0f5c4a;
+  --font-display: "Noto Serif TC", "Songti TC", serif;
+  --font-body: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
+  --font-data: "IBM Plex Mono", ui-monospace, "SFMono-Regular", monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #131714; --surface: #1b201c; --land: #252b26; --land-edge: #6d766f;
+    --fg: #e8ece6; --muted: #9ba59d; --rule: #323a34; --accent: #5cc4a4; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #131714; --surface: #1b201c; --land: #252b26; --land-edge: #6d766f;
+  --fg: #e8ece6; --muted: #9ba59d; --rule: #323a34; --accent: #5cc4a4; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 15px; line-height: 1.6; }
+a { color: var(--accent); }
+.wrap { max-width: 1200px; margin: 0 auto; padding-inline: 16px; padding-block: 24px 48px; display: grid; gap: 28px; }
+header { display: grid; gap: 8px; }
+.back { font-size: 14px; font-weight: 700; text-decoration: none; }
+.eyebrow { font-size: 12px; letter-spacing: .12em; color: var(--accent); font-weight: 700; }
+h1 { font-family: var(--font-display); font-weight: 900; font-size: clamp(26px, 4.6vw, 40px); line-height: 1.2; margin: 0; text-wrap: balance; }
+.lede { color: var(--muted); max-width: 70ch; margin: 0; }
+.notice { font-size: 13px; border-left: 3px solid var(--accent); background: var(--surface); padding: 8px 12px; border-radius: 0 8px 8px 0; max-width: 80ch; }
+section { display: grid; gap: 12px; }
+section h2 { font-family: var(--font-display); font-size: 24px; margin: 0; }
+.dirnote { font-size: 13px; color: var(--muted); margin: 0; }
+.pair { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
+.mapbox { border: 1px solid var(--rule); border-radius: 10px; overflow: hidden; }
+.map { height: min(62vh, 560px); min-height: 380px; background: var(--bg); }
+.leaflet-container { background: var(--bg); font-family: var(--font-body); }
+.leaflet-tooltip.st { background: var(--surface); color: var(--fg); border: 1.5px solid; font-weight: 700; font-size: 12px; padding: 1px 6px; box-shadow: none; }
+.leaflet-tooltip.st::before { display: none; }
+.leaflet-tooltip.cty { background: transparent; border: 0; box-shadow: none; color: var(--muted); font-size: 14px; font-weight: 700; }
+.leaflet-popup-content-wrapper, .leaflet-popup-tip { background: var(--surface); color: var(--fg); }
+.leaflet-bar a { background: var(--surface); color: var(--fg); border-color: var(--rule); }
+.tablebox { overflow-x: auto; border: 1px solid var(--rule); border-radius: 10px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+th, td { padding: 8px 10px; border-bottom: 1px solid var(--rule); text-align: left; vertical-align: top; }
+th { font-size: 12px; color: var(--muted); font-weight: 700; letter-spacing: .04em; white-space: nowrap; }
+td.cty { white-space: nowrap; }
+td.num { font-family: var(--font-data); font-variant-numeric: tabular-nums; white-space: nowrap; }
+tr:last-child td { border-bottom: 0; }
+.sw { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+.stn { font-weight: 700; white-space: nowrap; }
+.small { font-size: 12px; color: var(--muted); }
+.tight { color: #b45309; font-weight: 700; }
+footer { color: var(--muted); font-size: 13px; max-width: 80ch; display: grid; gap: 6px; border-top: 1px solid var(--rule); padding-top: 16px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <a class="back" href="index.html">← 回到國道救護可及性地圖</a>
+    <div class="eyebrow">國道 1 號高架路段 · 依行車方向 · 以反應時間計</div>
+    <h1>汐五・五楊高架：誰的救護車最快到？</h1>
+    <p class="lede">汐止五股高架與五股楊梅高架全長約 58 公里，跨越新北市、臺北市與桃園市。每 100 公尺一點，計算附近每個消防分隊開到該點的時間（必須從上游匝道上高架、不塞車），標出最快的分隊；並列出第二快的分隊與時間差，差距小的路段，換分隊出勤也只慢一點點。</p>
+    <div class="notice">北上高架在 OpenStreetMap 中，機場系統到五股之間沒有入口，所以北上大段由同一個分隊負責。這一點待核對（見 <a href="https://github.com/shengwenhou/Highway-EMS-reachability/blob/main/VERIFY.md">VERIFY.md</a>）；若實際有入口，北上的分工會明顯改變。</div>
+  </header>
+  <section id="north">
+    <h2>北上（往汐止）</h2>
+    <p class="dirnote">路段依「反應時間最短的分隊」上色；圓點是分隊位置，虛線是縣市界。點選路段可看時間與次佳分隊。</p>
+    <div class="pair">
+      <div class="mapbox"><div class="map" id="map-北上" aria-label="北上方向救護分工地圖"></div></div>
+      <div class="tablebox"><table id="tbl-北上"></table></div>
+    </div>
+  </section>
+  <section id="south">
+    <h2>南下（往楊梅）</h2>
+    <p class="dirnote">路段依「反應時間最短的分隊」上色；圓點是分隊位置，虛線是縣市界。點選路段可看時間與次佳分隊。</p>
+    <div class="pair">
+      <div class="mapbox"><div class="map" id="map-南下" aria-label="南下方向救護分工地圖"></div></div>
+      <div class="tablebox"><table id="tbl-南下"></table></div>
+    </div>
+  </section>
+  <footer>
+    <div>「慢 X 分」是第二快的分隊比最快的分隊多花的時間；若路段內不一致，以「最小值–中位數」表示。差距小於 1 分鐘的以橘字標示，代表兩個分隊幾乎一樣快。</div>
+    <div>以「距離」計算最近分隊時，有些路段的答案不同（表中註明）。時間用 OSM 速限或道路等級預設值，不含出勤準備時間與塞車。資料：© OpenStreetMap contributors、內政部消防署、taiwan-atlas 縣市界。</div>
+  </footer>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+const D = __DATA__;
+const dark = () => {
+  const t = document.documentElement.dataset.theme;
+  return t ? t === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+};
+const col = (slot) => D.palette[slot][dark() ? 1 : 0];
+const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const maps = {};
+
+function build(dir) {
+  const pts = D.points[dir];
+  const map = L.map("map-" + dir, { zoomSnap: 0.25, preferCanvas: true })
+    .fitBounds(L.latLngBounds(pts.map((p) => [p[1], p[0]])).pad(0.1));
+  map.attributionControl.setPrefix(false).addAttribution("© OpenStreetMap contributors · 消防署");
+  const county = L.geoJSON(D.counties, {
+    interactive: false,
+    style: () => ({ color: css("--land-edge"), weight: 1.6, dashArray: "6 5", fillColor: css("--land"), fillOpacity: 1 }),
+    onEachFeature: (f, layer) => layer.bindTooltip(f.properties.COUNTYNAME.replace("台", "臺"), { permanent: true, direction: "center", className: "cty" }),
+  }).addTo(map);
+  // runs of consecutive points (travel order) with the same fastest station on a continuous stretch
+  const layers = [];
+  let i = 0;
+  while (i < pts.length) {
+    let j = i;
+    while (j + 1 < pts.length && pts[j + 1][2] === pts[i][2] && Math.abs(pts[j + 1][3] - pts[j][3]) < 0.5) j++;
+    const ll = pts.slice(i, j + 1).map((p) => [p[1], p[0]]);
+    if (j + 1 < pts.length && Math.abs(pts[j + 1][3] - pts[j][3]) < 0.5) ll.push([pts[j + 1][1], pts[j + 1][0]]);
+    if (ll.length < 2) ll.push(ll[0]);
+    const a = pts[i], b = pts[j];
+    const line = L.polyline(ll, { color: col(a[2]), weight: 7, lineCap: "butt" }).addTo(map);
+    line.slot = a[2];
+    line.bindPopup(() => {
+      const st = D.stations[dir].find((s) => s.slot === a[2]);
+      return `<b>${Math.min(a[3], b[3]).toFixed(1)}–${Math.max(a[3], b[3]).toFixed(1)}K</b><br>最快：${st.label}（${Math.min(a[4], b[4]).toFixed(1)}–${Math.max(a[4], b[4]).toFixed(1)} 分）<br><span class="small">次佳：${a[5]}</span>`;
+    });
+    layers.push(line);
+    i = j + 1;
+  }
+  const slots = new Set(pts.map((p) => p[2]));
+  const marks = [];
+  D.stations[dir].filter((s) => slots.has(s.slot)).forEach((s) => {
+    const m = L.circleMarker([s.lat, s.lon], { radius: 8, weight: 2.5, color: css("--surface"), fillColor: col(s.slot), fillOpacity: 1 })
+      .bindTooltip(s.short, { permanent: true, direction: "right", offset: [8, 0], className: "st" }).addTo(map);
+    m.slot = s.slot; marks.push(m);
+  });
+  const all = L.featureGroup([...layers, ...marks]);
+  map.fitBounds(all.getBounds().pad(0.08));
+  maps[dir] = { map, county, layers, marks };
+}
+
+function table(dir) {
+  const rows = D.segments.filter((s) => s.direction === dir);
+  const slotOf = (name) => (D.stations[dir].find((s) => s.name === name) || {}).slot;
+  const sh = (name) => name.replace(/^.*?消防局/, "").replace(/第.救災救護大隊/, "");
+  document.getElementById("tbl-" + dir).innerHTML =
+    `<thead><tr><th>路段</th><th>縣市</th><th>最快分隊</th><th>反應時間</th><th>次佳分隊（差距）</th></tr></thead><tbody>` +
+    rows.map((s) => {
+      const a = Math.min(s.km_start, s.km_end).toFixed(1), b = Math.max(s.km_start, s.km_end).toFixed(1);
+      const tight = s.margin_min_min < 1;
+      return `<tr><td class="num">${a}–${b}K<div class="small">${s.length_km} km・${s.road.replaceAll("道路", "")}</div></td>` +
+        `<td class="cty">${s.counties.split("、").join("<br>")}</td>` +
+        `<td><span class="sw" style="background:${col(slotOf(s.best))}"></span><span class="stn">${s.best_label}</span>` +
+        `${s.dist_best_differs ? `<div class="small">以距離計為${sh(s.dist_station)}</div>` : ""}</td>` +
+        `<td class="num">${s.best_min_range} 分</td>` +
+        `<td>${s.second_label}<div class="small ${tight ? "tight" : ""}">慢 ${s.margin_min_min === s.margin_min_median ? s.margin_min_min : s.margin_min_min + "–" + s.margin_min_median} 分</div></td></tr>`;
+    }).join("") + `</tbody>`;
+}
+
+["北上", "南下"].forEach((d) => { build(d); table(d); });
+function retheme() {
+  Object.values(maps).forEach(({ county, layers, marks }) => {
+    county.setStyle({ color: css("--land-edge"), fillColor: css("--land") });
+    layers.forEach((l) => l.setStyle({ color: col(l.slot) }));
+    marks.forEach((m) => m.setStyle({ color: css("--surface"), fillColor: col(m.slot) }));
+  });
+  ["北上", "南下"].forEach(table);
+}
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", retheme);
+new MutationObserver(retheme).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+</script>
+</body>
+</html>
