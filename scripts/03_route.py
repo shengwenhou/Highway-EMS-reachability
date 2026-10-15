@@ -45,6 +45,12 @@ FREEWAY_REFS = {"1", "2", "2甲", "3", "3甲", "4", "5", "6", "8", "10"}
 # Directions: N-S freeways are 北上/南下, the rest 東行/西行.
 NS_REFS = {"1", "3", "5"}
 NOT_FREEWAY_NAMES = ("高雄港聯外高架道路",)
+# OSM ways whose oneway direction is drawn backwards, verified against 高公局 interchange diagrams.
+# Value "-1" reverses the way's direction. See VERIFY.md section 一.
+ONEWAY_FIX = {
+    317134259: "-1",   # 國3 白河交流道南下出口 (OSM drew it as an entrance; 高公局 diagram 03-311)
+    317134263: "-1",
+}
 SNAP_SPEED_KMH = 20      # station -> nearest graph node, straight-line
 SAMPLE_STEP_M = 100      # resolution used to find the worst point inside each 1-km segment
 
@@ -89,7 +95,7 @@ def build_graph(ways):
         for n, g in zip(nodes, geom):
             if g:
                 node_ll[n] = (g["lon"], g["lat"])
-        ow = t.get("oneway", "")
+        ow = ONEWAY_FIX.get(wid, t.get("oneway", ""))
         if hw in IGNORE_ONEWAY:
             fwd, bwd = True, True
         elif ow in ("yes", "1", "true"):
