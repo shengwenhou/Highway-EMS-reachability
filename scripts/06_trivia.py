@@ -116,14 +116,21 @@ def build_cards(p, st, hp):
     m = p[p.kind == "main"]
     cards = []
 
-    # 1 response farthest (main line)
-    i = m.dist_km.idxmax()
+    # 1 response farthest (main line and viaducts)
+    i = p.dist_km.idxmax()
     r = p.loc[i]
+    rm = m.loc[m.dist_km.idxmax()]       # farthest on a ground-level main line, for comparison
+    viaduct = "高架" in str(r.road_name)
     cards.append(dict(
-        tag="極端值", title="救護極遠點", place=f"國道 {r.ref} 號{r.direction} {r.km:.0f}K（{r.county}旗山端前）",
+        tag="極端值", title="救護極遠點",
+        place=f"國道 {r.ref} 號{r.direction} {r.km:.1f}K（{r.road_name if viaduct else r.county}）",
         big=f"{r.dist_km:.1f}", unit="公里", sub=f"{r.time_min:.1f} 分鐘",
-        body="主線上離消防分隊最遠的點。最近的旗山分隊其實只在 2.5 公里外，但嶺口交流道東行只有出口，"
-             f"救護車只能從{short(r.station_dist)}上國 3、再轉國 10 一路開過來。",
+        body=(f"全國國道（含高架）離消防分隊最遠的點。北上五楊高架在機場系統到五股之間沒有任何入口，"
+              f"泰山轉接道北上也只出不進，所以最近的{short(r.station_dist)}得先到機場系統上高架，再一路往北開。"
+              f"平面主線上最遠的則是國道 {rm.ref} 號{rm.direction} {rm.km:.1f}K（{rm.dist_km:.1f} 公里），"
+              "因為嶺口交流道東行只有出口。") if viaduct else
+             ("離消防分隊最遠的點。最近的旗山分隊其實只在 2.5 公里外，但嶺口交流道東行只有出口，"
+              f"救護車只能從{short(r.station_dist)}上國 3、再轉國 10 一路開過來。"),
         svg=dot(r.lon, r.lat), link=i))
 
     # 2 transport farthest
