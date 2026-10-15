@@ -1,3 +1,5 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>國道救護可及性地圖</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -38,6 +40,7 @@
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 body { background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 15px; line-height: 1.6; }
 .wrap { max-width: 1200px; margin: 0 auto; padding-inline: 16px; padding-block: 24px 40px; display: grid; gap: 20px; }
 header { display: grid; gap: 8px; }
@@ -170,13 +173,16 @@ ol.rank button:focus-visible { outline: 2px solid var(--accent); }
     <div class="qform">
       <div>
         <h2 id="q-title">查詢點位</h2>
-        <div class="note">選國道、方向與公里數，或直接在地圖上點選國道。</div>
+        <div class="note">選國道、方向與公里數（國道 1 號可另選汐五、五楊高架），或直接在地圖上點選國道。</div>
       </div>
       <label class="f" for="q-ref">國道
         <select id="q-ref"></select>
       </label>
       <label class="f" for="q-dir">方向
         <select id="q-dir"></select>
+      </label>
+      <label class="f" for="q-road" id="q-road-wrap">路線
+        <select id="q-road"></select>
       </label>
       <label class="f" for="q-km">公里數（K）
         <input id="q-km" type="number" inputmode="decimal" step="0.1" placeholder="例如 295">
@@ -420,34 +426,53 @@ const qPick = document.getElementById("q-pick");
 const queryLayer = L.layerGroup().addTo(map);
 let pickMode = false;
 
+const qRoad = document.getElementById("q-road"), qRoadWrap = document.getElementById("q-road-wrap");
+const GROUND = "平面主線";
+const isElevated = (name) => /高架/.test(name || "");
+// OSM spells some viaduct pieces differently (e.g. 中山高汐止五股高架橋); fold them into one route name
+const routeName = (name) => (/汐止五股/.test(name) ? "汐止五股高架道路" : /五股楊梅/.test(name) ? "五股楊梅高架道路" : name);
+// every point grouped by freeway / direction / route (平面主線 or the viaduct's own name)
+const ROUTES = new Map();
+for (let i = 0; i < Q.km.length; i++) {
+  const c = Q.chains[chainOf[i]], road = Q.roads[Q.rn[i]] || c.name;
+  const key = `${c.ref}|${c.dir}`, route = isElevated(road) ? routeName(road) : GROUND;
+  if (!ROUTES.has(key)) ROUTES.set(key, new Map());
+  const m = ROUTES.get(key);
+  if (!m.has(route)) m.set(route, { idx: [], km0: Infinity, km1: -Infinity });
+  const r = m.get(route);
+  r.idx.push(i);
+  if (Q.km[i] >= 0) { r.km0 = Math.min(r.km0, Q.km[i]); r.km1 = Math.max(r.km1, Q.km[i]); }
+}
 const refs = REF_ORDER.filter((r) => Q.chains.some((c) => c.ref === r));
 qRef.innerHTML = refs.map((r) => `<option value="${r}">國道 ${r} 號</option>`).join("");
 function mainChains(ref, d) { return Q.chains.filter((c) => c.ref === ref && c.kind === "main" && (!d || c.dir === d)); }
-function kmRange(ref, d) {
-  const cs = Q.chains.filter((c) => c.ref === ref && c.dir === d);
-  return [Math.max(0, Math.min(...cs.map((c) => c.km0))), Math.max(...cs.map((c) => c.km1))];
-}
+function route() { return (ROUTES.get(`${qRef.value}|${qDir.value}`) || new Map()).get(qRoad.value || GROUND); }
+function kmRange() { const r = route(); return r ? [Math.max(0, r.km0), r.km1] : [0, 0]; }
 function fillDirs() {
   const dirs = [...new Set(mainChains(qRef.value).map((c) => c.dir))];
   qDir.innerHTML = dirs.map((d) => `<option value="${d}">${d}</option>`).join("");
+  fillRoads();
+}
+function fillRoads() {
+  const m = ROUTES.get(`${qRef.value}|${qDir.value}`) || new Map();
+  const names = [GROUND, ...[...m.keys()].filter((n) => n !== GROUND).sort((a, b) => m.get(a).km0 - m.get(b).km0)];
+  const keep = qRoad.value;
+  qRoad.innerHTML = names.map((n) => `<option value="${n}">${n === GROUND ? n : n.replace("道路", "")}</option>`).join("");
+  if (names.includes(keep)) qRoad.value = keep;
+  qRoadWrap.hidden = names.length < 2;
   showRangeHint();
 }
 function showRangeHint() {
-  const [a, b] = kmRange(qRef.value, qDir.value);
+  const [a, b] = kmRange();
   qKm.min = a.toFixed(1); qKm.max = b.toFixed(1);
   qHint.className = "qhint";
   qHint.textContent = `可輸入 ${a.toFixed(1)}–${b.toFixed(1)} K`;
 }
 qRef.addEventListener("change", fillDirs);
-qDir.addEventListener("change", showRangeHint);
+qDir.addEventListener("change", fillRoads);
+qRoad.addEventListener("change", showRangeHint);
 fillDirs();
 
-function nearestOnChain(ci, km) {
-  const c = Q.chains[ci];
-  let best = c.i0, bd = Infinity;
-  for (let i = c.i0; i <= c.i1; i++) { const d = Math.abs(Q.km[i] - km); if (d < bd) { bd = d; best = i; } }
-  return { i: best, err: bd };
-}
 function chainLabel(ci, i) {
   const c = Q.chains[ci];
   const road = Q.roads[Q.rn[i]] || c.name;
@@ -465,21 +490,15 @@ function runForm() {
   qChoices.innerHTML = "";
   const raw = qKm.value.trim();
   const km = Number(raw);
-  const [a, b] = kmRange(qRef.value, qDir.value);
+  const [a, b] = kmRange();
+  const name = `國道${qRef.value}號${qDir.value}${qRoadWrap.hidden ? "" : (qRoad.value === GROUND ? "平面主線" : qRoad.value.replace("道路", ""))}`;
   if (raw === "" || !Number.isFinite(km)) { qHint.className = "qhint err"; qHint.textContent = "請輸入公里數（數字），例如 295 或 295.3"; qKm.focus(); return; }
-  if (km < a - 0.05 || km > b + 0.05) { qHint.className = "qhint err"; qHint.textContent = `國道${qRef.value}號${qDir.value}只有 ${a.toFixed(1)}–${b.toFixed(1)} K，請重新輸入`; qKm.focus(); return; }
+  if (km < a - 0.05 || km > b + 0.05) { qHint.className = "qhint err"; qHint.textContent = `${name}只有 ${a.toFixed(1)}–${b.toFixed(1)} K，請重新輸入`; qKm.focus(); return; }
   showRangeHint();
-  const cands = [];
-  Q.chains.forEach((c, ci) => {
-    if (c.ref !== qRef.value || c.dir !== qDir.value) return;
-    if (km < c.km0 - 0.15 || km > c.km1 + 0.15) return;
-    const n = nearestOnChain(ci, km);
-    if (n.err <= 0.15) cands.push({ ci, i: n.i, main: c.kind === "main" });
-  });
-  if (!cands.length) { qHint.className = "qhint err"; qHint.textContent = "這個公里數附近找不到車道資料，請換一個公里數"; return; }
-  cands.sort((x, y) => y.main - x.main);
-  if (cands.length === 1) showResult(cands[0].i);
-  else offerChoices(cands, "這個位置有平面與高架兩條車道，請選擇：");
+  let best = -1, bd = Infinity;
+  route().idx.forEach((i) => { const d = Math.abs(Q.km[i] - km); if (d < bd) { bd = d; best = i; } });
+  if (best < 0 || bd > 0.3) { qHint.className = "qhint err"; qHint.textContent = `${name}在這個公里數附近沒有車道資料，請換一個公里數`; return; }
+  showResult(best);
 }
 document.getElementById("q-go").addEventListener("click", runForm);
 qKm.addEventListener("keydown", (e) => { if (e.key === "Enter") runForm(); });
@@ -526,10 +545,14 @@ function pctLine(p, word) {
 function junctions(ci, i) {
   const c = Q.chains[ci], s = Q.s[i];
   let up = null, down = null;
-  c.junc.forEach((j) => { if (j[0] <= s && (!up || j[0] > up[0])) up = j; if (j[0] > s && (!down || j[0] < down[0])) down = j; });
+  // nearest entrance behind the point (where an ambulance can get on) and exit ahead of it
+  c.junc.forEach((j) => {
+    if (j[3] === "in" && j[0] <= s && (!up || j[0] > up[0])) up = j;
+    if (j[3] === "out" && j[0] > s && (!down || j[0] < down[0])) down = j;
+  });
   return { up, down };
 }
-const jName = (j) => (j ? `${j[2]}（${j[1]}K）` : "無資料");
+const jName = (j) => (j ? `${j[2]}（${Number(j[1]).toFixed(1)}K）` : "無資料");
 function riskColor(r) { return css(RISK_VAR[r]); }
 
 function showResult(i) {
@@ -576,12 +599,12 @@ function showResult(i) {
   qCard.innerHTML = `
     <div><h3>國道 ${c.ref} 號　${c.dir}　${Q.km[i].toFixed(1)}K</h3>
       <div class="tags">${tags.map((t) => `<span class="tag">${t}</span>`).join("")}</div>
-      <div class="sub">上游交流道：${jName(up)}　下游交流道：${jName(down)}</div></div>
+      <div class="sub">上游最近入口：${jName(up)}　下游最近出口：${jName(down)}</div></div>
     <div class="blocks">
       <div class="blk"><h4>🚑 救護反應（消防分隊 → 事故點）</h4>
         <div class="kv"><span>距離</span><span class="v">${Q.d[i].toFixed(1)} 公里</span><span></span><span>${pctLine(Q.pd[i], "遠")}</span>
         <span>時間</span><span class="v">${Q.t[i].toFixed(1)} 分鐘</span><span></span><span>${pctLine(Q.pt[i], "久")}</span></div>
-        <div class="note">最近分隊：<b>${st}</b>${stT !== st ? `（以時間計為 ${stT}）` : ""}，需由上游交流道進入同方向車道${up ? `，最近的上游交流道為${jName(up)}` : ""}。</div>
+        <div class="note">最近分隊：<b>${st}</b>${stT !== st ? `（以時間計為 ${stT}）` : ""}，需由上游入口進入同方向車道${up ? `，最近的上游入口為${jName(up)}` : ""}。</div>
         <div class="note">${Q.x[i] ? `<b>跨區救護較近</b>：事故點在${county}，最近的分隊屬於${stCounty}。` : `同縣市救護（${county}）。`}</div>
       </div>
       <div class="blk"><h4>🏥 送醫（事故點 → 最近重度級醫院）</h4>

@@ -341,11 +341,17 @@ def query_data(points):
         if not len(idx):
             continue
         sub = pts.iloc[idx]
-        seen, junc = set(), []
-        for sj, kmj, name in ch["junctions"]:
-            if name and name not in seen:
-                seen.add(name)
-                junc.append([round(sj), kmj, name])
+        # entrances ("in") and exits ("out") along this carriageway, from the road graph; the ends of
+        # a chain connect straight to another carriageway, so they count as an entrance / exit too
+        L = ch["s"][-1]
+        end_name = lambda s0: next((n for sj, _, n in ch["junctions"] if abs(sj - s0) < 500 and n), "")
+        junc = [[round(sj), kmj, name, t] for sj, kmj, name, t in ch["ramps"]]
+        if not any(t == "in" and sj < 500 for sj, _, _, t in junc):
+            junc.insert(0, [0, round(float(sub.km.iloc[0]), 1),
+                            end_name(0) or ("高架起點（由主線接入）" if ch["kind"] == "branch" else "路段起點"), "in"])
+        if not any(t == "out" and sj > L - 500 for sj, _, _, t in junc):
+            junc.append([round(L), round(float(sub.km.iloc[-1]), 1),
+                         end_name(L) or ("高架終點（接回主線）" if ch["kind"] == "branch" else "路段終點"), "out"])
         chains.append({"id": ch["chain"], "ref": ch["ref"], "dir": ch["direction"], "kind": ch["kind"],
                        "name": ch["name"], "i0": int(idx[0]), "i1": int(idx[-1]),
                        "km0": float(sub.km.min()), "km1": float(sub.km.max()), "junc": junc})
