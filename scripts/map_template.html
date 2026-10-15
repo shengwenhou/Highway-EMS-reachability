@@ -45,6 +45,9 @@ header { display: grid; gap: 8px; }
 h1 { font-family: var(--font-display); font-weight: 900; font-size: clamp(26px, 4.4vw, 40px); line-height: 1.2; margin: 0; text-wrap: balance; }
 .lede { color: var(--muted); max-width: 68ch; margin: 0; }
 .stats { display: flex; flex-wrap: wrap; gap: 8px 28px; font-size: 13px; color: var(--muted); }
+.trivia-link { justify-self: start; font-size: 14px; font-weight: 700; color: var(--accent); text-decoration: none; border: 1px solid var(--accent); border-radius: 99px; padding: 4px 14px; }
+.trivia-link:hover { background: var(--accent); color: var(--surface); }
+.trivia-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .stats b { font-family: var(--font-data); font-weight: 500; color: var(--fg); font-size: 18px; margin-right: 4px; font-variant-numeric: tabular-nums; }
 .controls { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; }
 .seg { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--rule); border-radius: 8px; overflow: hidden; background: var(--surface); }
@@ -133,6 +136,7 @@ ol.rank button:focus-visible { outline: 2px solid var(--accent); }
     <h1>國道上出事時，救護車多久到、多久送到醫院？</h1>
     <p class="lede">把每一條國道依行車方向切成一公里一段，找出每段裡最不利的點。反應：最近消防分隊的救護車必須從上游交流道進入同方向車道。送醫：從事故點沿同方向開到下一個出口，再送往最近的重度級急救責任醫院。都不限同縣市。</p>
     <div class="stats" id="stats"></div>
+    <a class="trivia-link" href="trivia.html">國道救護冷知識：從資料裡挑出的 14 件事 →</a>
   </header>
 
   <div class="controls">
@@ -621,4 +625,11 @@ mq.addEventListener ? mq.addEventListener("change", retheme) : mq.addListener(re
 new MutationObserver(retheme).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
 themeStatic();
 draw();
+// Deep link from the trivia page: #pt-<index into the query table>
+function openFromHash() {
+  const mt = /^#pt-(\d+)$/.exec(location.hash);
+  if (mt && +mt[1] < Q.km.length) { showResult(+mt[1]); document.getElementById("q-title").scrollIntoView({ block: "start" }); }
+}
+window.addEventListener("hashchange", openFromHash);
+openFromHash();
 </script>
