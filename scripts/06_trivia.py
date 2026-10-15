@@ -365,6 +365,7 @@ footer { color: var(--muted); font-size: 13px; max-width: 80ch; display: grid; g
   <header>
     <a class="back" href="index.html">← 回到國道救護可及性地圖</a>
     <a class="back" href="wuyang.html">看汐五・五楊高架的救護分工 →</a>
+    <a class="back" href="crash.html">看國道事故地圖 →</a>
     <div class="eyebrow">從 2 萬個國道點位算出來的 14 件事</div>
     <h1>國道救護冷知識</h1>
     <p class="lede">我們把台灣每一條國道依行車方向每 100 公尺取一個點，算出救護車多久到、送醫要多遠，以及救護車停在路上時被追撞的風險。以下是資料裡最極端、也最出人意料的幾個地方。</p>
