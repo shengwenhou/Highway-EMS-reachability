@@ -72,6 +72,26 @@ label.check { display: inline-flex; gap: 6px; align-items: center; font-size: 14
 .sw { width: 22px; height: 5px; border-radius: 3px; display: inline-block; }
 .leaflet-popup-content-wrapper, .leaflet-popup-tip { background: var(--surface); color: var(--fg); }
 .leaflet-popup-content { margin: 12px 14px; font-size: 13px; line-height: 1.55; }
+.cmp { display: grid; gap: 6px; }
+.cmp-t { font-weight: 700; font-size: 13px; }
+.cmp table { border-collapse: collapse; width: 100%; font-size: 13px; }
+.cmp th { text-align: left; font-size: 11.5px; color: var(--muted); font-weight: 700; padding: 2px 6px 4px; border-bottom: 1px solid var(--rule); }
+.cmp td { padding: 6px; border-bottom: 1px solid var(--rule); vertical-align: middle; white-space: nowrap; }
+.cmp tr[data-i] { cursor: pointer; }
+.cmp tr[data-i]:hover td, .cmp tr[data-i]:focus-visible td { background: var(--bg); }
+.cmp tr[data-i]:focus-visible { outline: 2px solid var(--accent); }
+.cmp td.n { font-family: var(--font-data); font-variant-numeric: tabular-nums; }
+.cmp .lane { display: inline-block; margin-left: 6px; font-size: 11.5px; padding: 0 6px; border: 1px solid var(--rule); border-radius: 999px; }
+.cmp .km { font-family: var(--font-data); font-size: 11.5px; color: var(--muted); }
+.cmp .cdot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 5px; vertical-align: 0; }
+.cmp-n { font-size: 11.5px; color: var(--muted); }
+@media (max-width: 480px) {
+  .cmp td { padding: 5px 3px; }
+  .cmp th { padding: 2px 3px 4px; }
+  .cmp .lane { display: block; margin: 2px 0 0; width: max-content; }
+  .cmp small { display: none; }
+  .cmp .cdot { margin-right: 3px; }
+}
 .pop h3 { margin: 0 0 4px; font-size: 15px; }
 .pop .v { font-family: var(--font-data); font-variant-numeric: tabular-nums; }
 .pop .s { color: var(--muted); }
@@ -473,19 +493,6 @@ qDir.addEventListener("change", fillRoads);
 qRoad.addEventListener("change", showRangeHint);
 fillDirs();
 
-function chainLabel(ci, i) {
-  const c = Q.chains[ci];
-  const road = Q.roads[Q.rn[i]] || c.name;
-  const elevated = /高架/.test(road);
-  return `國道${c.ref} ${c.dir}　${elevated ? road : (c.kind === "main" ? "主線" : road || "支線")}`;
-}
-function offerChoices(cands, title) {
-  qChoices.innerHTML = `<div class="note">${title}</div>` + cands.map((c, k) =>
-    `<button type="button" data-k="${k}">${chainLabel(c.ci, c.i)}　${Q.km[c.i].toFixed(1)}K</button>`).join("");
-  qChoices.querySelectorAll("button").forEach((b) => b.addEventListener("click", () => {
-    qChoices.innerHTML = ""; showResult(cands[+b.dataset.k].i);
-  }));
-}
 function runForm() {
   qChoices.innerHTML = "";
   const raw = qKm.value.trim();
@@ -524,13 +531,54 @@ map.on("click", (e) => {
     if (!best.has(ci) || d < best.get(ci).d) best.set(ci, { ci, i, d });
   }
   setPick(false);
-  const cands = [...best.values()].sort((a, b) => a.d - b.d);
+  let cands = [...best.values()];
   if (!cands.length) {
     qChoices.innerHTML = `<div class="qhint err">這裡附近 600 m 內沒有國道，請點在國道上。</div>`; return;
   }
-  offerChoices(cands, "請確認你要查詢的車道與方向：");
-  document.getElementById("q-title").scrollIntoView({ behavior: "smooth", block: "start" });
+  // a click cannot tell the carriageways apart (they are tens of metres apart, viaducts sit on top
+  // of the ground road), so list every carriageway at this spot and let the user compare
+  const dmin = Math.sqrt(Math.min(...cands.map((c) => c.d)));
+  cands = cands.filter((c) => Math.sqrt(c.d) <= dmin + 250);
+  qChoices.innerHTML = "";
+  showCompare(e.latlng, cands);
 });
+
+const DIR_ORDER = { "北上": 0, "東行": 0, "南下": 1, "西行": 1 };
+function laneName(i) {
+  const c = Q.chains[chainOf[i]], road = Q.roads[Q.rn[i]] || c.name;
+  return isElevated(road) ? routeName(road).replace("道路", "").replace("汐止五股", "汐五").replace("五股楊梅", "五楊") : "平面";
+}
+function dot(varName, label) {
+  return `<span class="cdot" style="background:${css(varName)}" title="${label}"></span>`;
+}
+function showCompare(latlng, cands) {
+  const rows = cands.map((c) => c.i).sort((a, b) => {
+    const ca = Q.chains[chainOf[a]], cb = Q.chains[chainOf[b]];
+    return REF_ORDER.indexOf(ca.ref) - REF_ORDER.indexOf(cb.ref) || DIR_ORDER[ca.dir] - DIR_ORDER[cb.dir] ||
+      (laneName(a) !== "平面") - (laneName(b) !== "平面");
+  });
+  const multiLane = new Set(rows.map(laneName)).size > 1;
+  const html = `<div class="cmp"><div class="cmp-t">這個位置有 ${rows.length} 條車道，點一列看完整資訊</div>` +
+    `<table><thead><tr><th>車道</th><th>反應</th><th>送醫</th><th>風險</th></tr></thead><tbody>` +
+    rows.map((i) => {
+      const c = Q.chains[chainOf[i]];
+      const [lt] = level(Q.pt[i]), [lh] = level(Q.pht[i]);
+      const r = Q.r[i];
+      return `<tr data-i="${i}" tabindex="0" role="button"><td><b>國${c.ref} ${c.dir}</b>${multiLane ? `<span class="lane">${laneName(i)}</span>` : ""}<div class="km">${Q.km[i].toFixed(1)}K</div></td>` +
+        `<td class="n">${dot(level(Q.pt[i])[1], lt)}${Q.t[i].toFixed(1)}<small> 分</small></td>` +
+        `<td class="n">${dot(level(Q.pht[i])[1], lh)}${Q.ht[i].toFixed(1)}<small> 分</small></td>` +
+        `<td>${dot(RISK_VAR[r], RISK_NAME[r])}${RISK_NAME[r]}</td></tr>`;
+    }).join("") + `</tbody></table>` +
+    `<div class="cmp-n">反應、送醫為分鐘；圓點顏色代表困難度（綠較容易 → 紫非常困難）。</div></div>`;
+  const w = Math.min(360, map.getSize().x - 90);
+  const pop = L.popup({ maxWidth: w, minWidth: Math.min(260, w), autoPanPaddingTopLeft: [48, 12], autoPanPaddingBottomRight: [12, 12] }).setLatLng(latlng).setContent(html).openOn(map);
+  const el = pop.getElement();
+  el.querySelectorAll("tr[data-i]").forEach((tr) => {
+    const go = () => { map.closePopup(); showResult(+tr.dataset.i); };
+    tr.addEventListener("click", go);
+    tr.addEventListener("keydown", (ev) => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); go(); } });
+  });
+}
 
 function level(p) {
   if (p >= 90) return ["非常困難", "--c4"];
