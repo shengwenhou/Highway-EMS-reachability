@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>國道事故發生率</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@700;900&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/*__LEAFLET_CSS__*/
+/* Same atlas-sheet identity and green -> purple scale as the main map. */
+:root {
+  --bg: #f5f6f2; --surface: #ffffff; --land: #e7eae3; --land-edge: #9aa198;
+  --fg: #1e2420; --muted: #5d665f; --rule: #d6dbd3; --accent: #0f5c4a;
+  --c0: #1f9e5a; --c1: #d9b310; --c2: #ec7a1c; --c3: #d33a2c; --c4: #7d3c98;
+  --font-display: "Noto Serif TC", "Songti TC", serif;
+  --font-body: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
+  --font-data: "IBM Plex Mono", ui-monospace, "SFMono-Regular", monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #131714; --surface: #1b201c; --land: #252b26; --land-edge: #59625b;
+    --fg: #e8ece6; --muted: #9ba59d; --rule: #323a34; --accent: #5cc4a4; color-scheme: dark;
+    --c0: #34b874; --c1: #e8c42e; --c2: #f28c38; --c3: #ec5a4a; --c4: #b072d0;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #131714; --surface: #1b201c; --land: #252b26; --land-edge: #59625b;
+  --fg: #e8ece6; --muted: #9ba59d; --rule: #323a34; --accent: #5cc4a4; color-scheme: dark;
+  --c0: #34b874; --c1: #e8c42e; --c2: #f28c38; --c3: #ec5a4a; --c4: #b072d0;
+}
+* { box-sizing: border-box; }
+html { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 15px; line-height: 1.6; }
+a { color: var(--accent); }
+.wrap { max-width: 1200px; margin: 0 auto; padding-inline: 16px; padding-block: 24px 48px; display: grid; gap: 24px; }
+header { display: grid; gap: 8px; }
+.back { font-size: 14px; font-weight: 700; text-decoration: none; }
+.eyebrow { font-size: 12px; letter-spacing: .12em; color: var(--accent); font-weight: 700; }
+h1 { font-family: var(--font-display); font-weight: 900; font-size: clamp(26px, 4.6vw, 40px); line-height: 1.2; margin: 0; text-wrap: balance; }
+.lede { color: var(--muted); max-width: 72ch; margin: 0; }
+.notice { font-size: 13.5px; border-left: 3px solid var(--c3); background: var(--surface); padding: 8px 12px; border-radius: 0 8px 8px 0; max-width: 84ch; display: grid; gap: 4px; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+.tile { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 10px 14px; }
+.tile .k { font-size: 12px; color: var(--muted); font-weight: 700; letter-spacing: .04em; }
+.tile .v { font-family: var(--font-data); font-size: 26px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.tile .s { font-size: 12px; color: var(--muted); }
+.controls { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; }
+.seg { display: inline-flex; border: 1px solid var(--rule); border-radius: 8px; overflow: hidden; background: var(--surface); }
+.seg button { font: inherit; font-size: 14px; border: 0; background: transparent; color: var(--fg); padding: 6px 12px; cursor: pointer; min-height: 36px; }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--surface); font-weight: 700; }
+.ctl-label { font-size: 12px; color: var(--muted); font-weight: 700; margin-right: 6px; }
+.pair { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
+@media (min-width: 980px) { .pair { grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); } }
+.mapbox { border: 1px solid var(--rule); border-radius: 10px; overflow: hidden; position: relative; }
+#map { height: min(78vh, 760px); min-height: 440px; background: var(--bg); }
+.leaflet-container { background: var(--bg); font-family: var(--font-body); }
+.leaflet-popup-content-wrapper, .leaflet-popup-tip { background: var(--surface); color: var(--fg); }
+.leaflet-bar a { background: var(--surface); color: var(--fg); border-color: var(--rule); }
+.legend { position: absolute; z-index: 500; left: 10px; bottom: 10px; background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; padding: 8px 10px; font-size: 12.5px; display: grid; gap: 3px; }
+.legend .t { font-weight: 700; font-size: 12px; }
+.legend .row { display: flex; align-items: center; gap: 6px; font-family: var(--font-data); }
+.sw { display: inline-block; width: 16px; height: 4px; border-radius: 2px; }
+.pop h3 { margin: 0 0 4px; font-size: 14px; }
+.pop .v { font-family: var(--font-data); font-weight: 500; }
+.pop .s { color: var(--muted); font-size: 12px; }
+.rankbox { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 12px; display: grid; gap: 6px; align-content: start; }
+.rankbox h2 { font-family: var(--font-display); font-size: 20px; margin: 0; }
+.rankbox .note { font-size: 12.5px; color: var(--muted); margin: 0; }
+ol#rank { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+ol#rank button { all: unset; box-sizing: border-box; cursor: pointer; display: grid; grid-template-columns: 26px minmax(0, 1fr) auto; gap: 2px 8px; width: 100%; padding: 6px 4px; border-radius: 6px; }
+ol#rank button:hover, ol#rank button:focus-visible { background: var(--bg); outline: none; }
+.rk { font-family: var(--font-data); color: var(--muted); text-align: right; }
+.loc { font-weight: 700; font-size: 14px; }
+.loc small { font-weight: 400; color: var(--muted); }
+.val { font-family: var(--font-data); white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; }
+.st { grid-column: 2 / 4; font-size: 12px; color: var(--muted); }
+footer { color: var(--muted); font-size: 13px; max-width: 84ch; display: grid; gap: 6px; border-top: 1px solid var(--rule); padding-top: 16px; }
+footer ul { margin: 0; padding-left: 1.2em; display: grid; gap: 4px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <a class="back" href="index.html">← 回到國道救護可及性地圖</a>
+    <div class="eyebrow" id="eyebrow"></div>
+    <h1>國道事故地圖：哪些路段最常出事？</h1>
+    <p class="lede" id="lede"></p>
+    <div class="notice">
+      <div><b>只含 A1、A2 事故。</b>A1 是 24 小時內有人死亡、A2 是有人受傷；只有財損的 A3 事故沒有公開逐案資料，所以實際事故件數遠多於此圖。</div>
+      <div><b>沒有推論救護分隊。</b>原始資料只記錄處理的警察單位，沒有記錄是哪個消防分隊出勤，所以本頁不推斷救護派遣。</div>
+      <div><b>未依車流量調整。</b>發生率是「每公里每年的事故件數」，車多的路段自然事故也多；這不等於「每百萬車公里」的肇事率。</div>
+    </div>
+  </header>
+
+  <div class="tiles" id="tiles"></div>
+
+  <div class="controls">
+    <div><span class="ctl-label">方向</span>
+      <span class="seg" role="group" aria-label="方向">
+        <button type="button" data-dir="all" aria-pressed="true">雙向</button>
+        <button type="button" data-dir="北上／東行" aria-pressed="false">北上／東行</button>
+        <button type="button" data-dir="南下／西行" aria-pressed="false">南下／西行</button>
+      </span>
+    </div>
+  </div>
+
+  <div class="pair">
+    <div class="mapbox"><div id="map" aria-label="國道事故發生率地圖"></div><div class="legend" id="legend"></div></div>
+    <div class="rankbox">
+      <h2 id="rank-title">發生率最高的路段</h2>
+      <p class="note" id="rank-note"></p>
+      <ol id="rank"></ol>
+    </div>
+  </div>
+
+  <footer>
+    <div><b>計算方式</b></div>
+    <ul id="method"></ul>
+    <div>資料：內政部警政署「傷亡道路交通事故資料」（政府資料開放授權條款第 1 版）、© OpenStreetMap contributors、taiwan-atlas 縣市界。逐案資料存在 <code>output/crashes_freeway.csv</code>，分段結果在 <code>output/crash_bins.csv</code>。</div>
+  </footer>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+const D = __DATA__;
+const GROUP = { "北上": "北上／東行", "東行": "北上／東行", "南下": "南下／西行", "西行": "南下／西行" };
+const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const cls = (v) => D.breaks.filter((b) => v >= b).length;
+const fmt = (v, d = 1) => Number(v).toFixed(d);
+const S = D.stats, Y0 = D.years[0], Y1 = D.years[1], NY = Y1 - Y0 + 1;
+let dir = "all";
+
+document.getElementById("eyebrow").textContent = `民國 ${Y0}–${Y1} 年 · A1＋A2 事故 · 每 ${D.bin_km} 公里一段 · 依行車方向`;
+document.getElementById("lede").textContent =
+  `國道公路警察局處理的 A1、A2 交通事故，依「發生地點」記載的國道、方向與里程，放到對應的車道上，每 ${D.bin_km} 公里一段計算「每公里每年的事故件數」。顏色由綠到紫，代表發生率由低到高。`;
+document.getElementById("tiles").innerHTML = [
+  ["A1＋A2 事故", S.crashes.toLocaleString(), `${NY} 年合計，每年約 ${Math.round(S.crashes / NY).toLocaleString()} 件`],
+  ["A1 事故", S.a1.toLocaleString(), `占 ${fmt(S.a1 / S.crashes * 100)}%`],
+  ["死亡（24 小時內）", S.deaths.toLocaleString(), "人"],
+  ["受傷", S.injuries.toLocaleString(), "人"],
+].map(([k, v, s]) => `<div class="tile"><div class="k">${k}</div><div class="v">${v}</div><div class="s">${s}</div></div>`).join("");
+
+const map = L.map("map", { zoomSnap: 0.25, preferCanvas: true }).fitBounds([[21.9, 120.0], [25.3, 122.0]]);
+map.attributionControl.setPrefix(false).addAttribution("© OpenStreetMap contributors · 警政署");
+const county = L.geoJSON(D.counties, { interactive: false, style: () => ({}) }).addTo(map);
+const canvas = L.canvas({ padding: 0.3, tolerance: 6 });
+const layer = L.layerGroup().addTo(map);
+const bins = D.bins.map(([ref, d, main, road, k0, k1, len, n, a1, dead, inj, rate, cty, flat]) => {
+  const ll = [];
+  for (let i = 0; i < flat.length; i += 2) ll.push([flat[i + 1], flat[i]]);
+  return { ref, d, main, road, k0, k1, len, n, a1, dead, inj, rate, cty, ll };
+});
+function popup(b) {
+  return `<div class="pop"><h3>國道${b.ref} ${b.d} ${fmt(b.k0)}K–${fmt(b.k1)}K</h3>` +
+    (b.main ? "" : `<div class="s">${b.road}</div>`) +
+    `<div>發生率 <span class="v">${fmt(b.rate, 2)}</span> 件／公里／年</div>` +
+    `<div>${NY} 年共 <span class="v">${b.n}</span> 件（A1 ${b.a1} 件）</div>` +
+    `<div>死亡 <span class="v">${b.dead}</span> 人・受傷 <span class="v">${b.inj}</span> 人</div>` +
+    `<div class="s">${b.cty}・本段長 ${fmt(b.len)} 公里</div></div>`;
+}
+function draw() {
+  layer.clearLayers();
+  bins.filter((b) => dir === "all" || GROUP[b.d] === dir).sort((a, b) => a.rate - b.rate).forEach((b) => {
+    b.line = L.polyline(b.ll, { renderer: canvas, color: css("--c" + cls(b.rate)), weight: 4, lineCap: "butt", opacity: 1 })
+      .bindPopup(() => popup(b)).addTo(layer);
+  });
+  const e = D.breaks;
+  const labels = [`< ${e[0]}`, ...e.slice(0, -1).map((a, i) => `${a}–${e[i + 1]}`), `≥ ${e[e.length - 1]}`];
+  document.getElementById("legend").innerHTML = `<div class="t">每公里每年 A1＋A2 件數</div>` +
+    labels.slice().reverse().map((l, i) => `<div class="row"><span class="sw" style="background:${css("--c" + (4 - i))}"></span>${l}</div>`).join("");
+  rank();
+  document.querySelectorAll("[data-dir]").forEach((b) => b.setAttribute("aria-pressed", b.dataset.dir === dir));
+}
+function rank() {
+  const list = bins.filter((b) => dir === "all" || GROUP[b.d] === dir).sort((a, b) => b.rate - a.rate).slice(0, 15);
+  document.getElementById("rank-note").textContent =
+    `全部 ${bins.length} 段的中位數是每公里每年 ${fmt(S.median_rate, 2)} 件。點一下可在地圖上定位。`;
+  const ol = document.getElementById("rank");
+  ol.innerHTML = "";
+  list.forEach((b, i) => {
+    const li = document.createElement("li");
+    li.innerHTML = `<button type="button"><span class="rk">${i + 1}</span>` +
+      `<span class="loc">國道${b.ref} ${b.d} ${fmt(b.k0, 0)}–${fmt(b.k1, 0)}K <small>${b.main ? "" : b.road.replace("道路", "") + "・"}${b.cty}</small></span>` +
+      `<span class="val"><span class="sw" style="background:${css("--c" + cls(b.rate))}"></span>${fmt(b.rate, 1)}</span>` +
+      `<span class="st">${NY} 年 ${b.n} 件・死亡 ${b.dead}・受傷 ${b.inj}</span></button>`;
+    li.querySelector("button").addEventListener("click", () => {
+      map.flyToBounds(L.latLngBounds(b.ll).pad(0.6), { duration: 0.6 });
+      setTimeout(() => b.line && b.line.openPopup(), 700);
+    });
+    ol.appendChild(li);
+  });
+}
+document.getElementById("method").innerHTML = [
+  `資料：警政署民國 ${Y0}–${Y1} 年逐案 A1、A2 事故，取處理單位為國道公路警察局者，共 ${S.crashes.toLocaleString()} 件（同一事故的多位當事者合併為一件）。`,
+  `定位：依「發生地點」文字中的國道編號、方向與公里數（例如「國道1號 38公里900.0公尺處南側向」），放到對應方向的車道。記載「高架」的放在五楊、汐五等高架段，其餘放在平面主線。共 ${S.placed.toLocaleString()} 件（${fmt(S.placed / S.crashes * 100)}%）可以定位；其餘缺里程、缺方向，或不在本專案的國道範圍內（例如國道 2 甲、台 76 線）。`,
+  `原始資料雖有經緯度，但大量事故共用同一組座標（例如一整段路只有一個點），所以不用座標定位。`,
+  `分段：每條車道依官方里程每 ${D.bin_km} 公里一段（頭尾不足 2.5 公里的併入相鄰段）。1 公里一段時，三年內有六成五的路段少於 5 件，數字起伏太大；10 公里一段則會把交流道附近的熱點抹平。`,
+  `發生率 = 該段事故件數 ÷ 該段長度 ÷ ${NY} 年。交流道匝道上的事故（約占 ${fmt(S.ramp_share * 100, 0)}%）依記載的主線里程計入。本專案的里程是用交流道位置內插，與現場公里牌可能差數百公尺，個別事故可能落到相鄰的一段。`,
+  `限制：未依車流量標準化；不含 A3 財損事故；高架與平面路段若原始記載沒有寫「高架」，會計入平面主線。`,
+].map((t) => `<li>${t}</li>`).join("");
+
+document.querySelectorAll("[data-dir]").forEach((b) => b.addEventListener("click", () => { dir = b.dataset.dir; draw(); }));
+function theme() { county.setStyle({ color: css("--land-edge"), weight: 0.8, fillColor: css("--land"), fillOpacity: 1 }); draw(); }
+theme();
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", theme);
+new MutationObserver(theme).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+</script>
+</body>
+</html>
