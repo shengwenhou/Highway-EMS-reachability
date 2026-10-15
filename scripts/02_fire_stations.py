@@ -1,6 +1,6 @@
 """Download and clean the national list of fire units (消防署「救援與應變單位點位」, data.gov.tw #5969).
 
-Keeps field units that dispatch ambulances (分隊 / 中隊); drops HQs, 大隊 offices,
+Keeps field units that dispatch ambulances (分隊 only); drops HQs, 大隊 and 中隊 offices,
 special search-and-rescue units and harbour units. Output: data/fire_stations.csv (committed to the repo).
 """
 import io
@@ -67,7 +67,9 @@ def main() -> None:
         df.loc[metric, "x"], df.loc[metric, "y"] = lon, lat
     df = df.rename(columns={"x": "lon", "y": "lat"})
 
-    keep = (df["name"].str.contains("分隊|中隊") & ~df["name"].str.contains("|".join(EXCLUDE))
+    # Only 分隊 run ambulances. 大隊 and 中隊 are command levels and do not, so a name must
+    # end in 分隊; names like 「…第二大隊大美分隊」 carry 大隊 only as a hierarchy prefix.
+    keep = (df["name"].str.endswith("分隊") & ~df["name"].str.contains("|".join(EXCLUDE))
             & ~df["name"].isin(HARBOUR_UNITS))
     out = df[keep].copy()
     # Main island only.

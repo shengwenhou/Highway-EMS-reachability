@@ -45,6 +45,7 @@ header { display: grid; gap: 8px; }
 h1 { font-family: var(--font-display); font-weight: 900; font-size: clamp(26px, 4.4vw, 40px); line-height: 1.2; margin: 0; text-wrap: balance; }
 .lede { color: var(--muted); max-width: 68ch; margin: 0; }
 .stats { display: flex; flex-wrap: wrap; gap: 8px 28px; font-size: 13px; color: var(--muted); }
+.links { display: flex; flex-wrap: wrap; gap: 8px; }
 .trivia-link { justify-self: start; font-size: 14px; font-weight: 700; color: var(--accent); text-decoration: none; border: 1px solid var(--accent); border-radius: 99px; padding: 4px 14px; }
 .trivia-link:hover { background: var(--accent); color: var(--surface); }
 .trivia-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
@@ -136,7 +137,10 @@ ol.rank button:focus-visible { outline: 2px solid var(--accent); }
     <h1>國道上出事時，救護車多久到、多久送到醫院？</h1>
     <p class="lede">把每一條國道依行車方向切成一公里一段，找出每段裡最不利的點。反應：最近消防分隊的救護車必須從上游交流道進入同方向車道。送醫：從事故點沿同方向開到下一個出口，再送往最近的重度級急救責任醫院。都不限同縣市。</p>
     <div class="stats" id="stats"></div>
-    <a class="trivia-link" href="trivia.html">國道救護冷知識：從資料裡挑出的 14 件事 →</a>
+    <div class="links">
+      <a class="trivia-link" href="trivia.html">國道救護冷知識：從資料裡挑出的 14 件事 →</a>
+      <a class="trivia-link" href="wuyang.html">汐五・五楊高架：誰的救護車最快到？ →</a>
+    </div>
   </header>
 
   <div class="controls">
@@ -203,7 +207,7 @@ ol.rank button:focus-visible { outline: 2px solid var(--accent); }
     <h2>計算方式</h2>
     <ul>
       <li>路網：OpenStreetMap（BBBike 2026-10-14 擷取），國道、快速道路到巷弄共約 187 萬個節點；遵守單行道與匝道方向（巷弄與 living street 除外）。</li>
-      <li>消防分隊：內政部消防署「救援與應變單位點位」，保留外勤分隊與中隊共 608 處，不含局本部、大隊部、特搜單位，以及不出勤國道救護的港區分隊；6 處原始座標為 0 的分隊以地址補上座標。</li>
+      <li>消防分隊：內政部消防署「救援與應變單位點位」，只保留外勤分隊共 564 處，不含局本部、大隊與中隊（不負責跑救護）、特搜單位，以及不出勤國道救護的港區分隊；6 處原始座標為 0 的分隊以地址補上座標。</li>
       <li>方向與路口：事故點只能經由同方向上游的交流道或系統交流道抵達，不跨越中央分隔島、不使用緊急出入口。</li>
       <li>速度：OSM 速限標示，未標示者以道路等級預設（國道 100、快速道路 80、省道 60、縣道 50、市區 30–40 km/h），不計壅塞與出勤準備時間（約 1–1.5 分鐘需另加）。</li>
       <li>里程：以交流道編號（即里程）內插，誤差約 ±1 公里；五楊、汐五高架依平行主線里程標示。距離最短與時間最短可能來自不同分隊。</li>
