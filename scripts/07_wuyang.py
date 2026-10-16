@@ -43,7 +43,7 @@ MIN_CHAIN_KM = 3.0          # skip short connector pieces
 CANDIDATE_RADIUS_KM = 15.0  # stations considered (straight line to the nearest viaduct point)
 # Reported practice for 五楊北上 (before 五股): 青埔 first, 隆恩 as 新北市's unit. Compared on the page.
 RULE_KM_FROM = 50.7         # just past the 機場系統 entrance merge (50.8K), the first entrance north of 中壢
-RULE_MARKS = [[70.9, "楊梅端"], [59.0, "中壢轉接道"], [50.8, "機場系統"], [35.0, "泰山轉接道"], [30.1, "五股"]]
+RULE_MARKS = [[70.9, "楊梅端"], [59.0, "中壢轉接道"], [50.8, "機場系統"], [36.0, "泰山轉接道"], [30.5, "五股"]]
 RULE_STATIONS = ("桃園市政府消防局青埔分隊", "新北市政府消防局隆恩分隊")
 TIME_LIMIT_S = 45 * 60
 SNAP_SPEED_KMH = r.SNAP_SPEED_KMH

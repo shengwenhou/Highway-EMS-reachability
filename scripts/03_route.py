@@ -55,6 +55,14 @@ ONEWAY_FIX = {
 # 高公局聯絡道: two-way link between the 國1 北上 (34.1K) and 南下 (34.3K) bus bays at the Freeway
 # Bureau, used by 五股分隊 to turn round (五股分隊 internal map, 2026-10). See VERIFY.md section 一.
 VERIFIED_LINKS = {136861416: "高公局聯絡道", 136861459: "高公局聯絡道", 1096877797: "高公局聯絡道"}
+# Mileage confirmed on the ground, as (ref, direction, lon, lat, km, source). Each point is projected
+# onto that carriageway and replaces interchange-number anchors within FIELD_ANCHOR_RADIUS_M of it.
+FIELD_KM_ANCHORS = [
+    ("1", "北上", 121.45009, 25.07207, 31.6, "五股交流道北上入口（五股分隊出勤圖）"),
+    ("1", "北上", 121.42417, 25.06676, 34.1, "高公局聯絡道（五股分隊出勤圖）"),
+    ("1", "南下", 121.42458, 25.06717, 34.3, "高公局聯絡道（五股分隊出勤圖）"),
+]
+FIELD_ANCHOR_RADIUS_M = 1500
 SNAP_SPEED_KMH = 20      # station -> nearest graph node, straight-line
 SAMPLE_STEP_M = 100      # resolution used to find the worst point inside each 1-km segment
 
@@ -328,6 +336,23 @@ def anchors_on_chain(ref, x, y, s, centres, max_off=400.0):
     return out
 
 
+def field_anchors(ref, direction, x, y, s, anchors, max_off=300.0):
+    """Add FIELD_KM_ANCHORS for this carriageway, dropping interchange anchors close to them."""
+    field = []
+    for r, d, lon, lat, kmv, _ in FIELD_KM_ANCHORS:
+        if r != ref or d != direction:
+            continue
+        fx, fy = to_m.transform(lon, lat)
+        dist = np.hypot(x - fx, y - fy)
+        k = int(np.argmin(dist))
+        if dist[k] <= max_off:
+            field.append((s[k], kmv))
+    if not field:
+        return anchors
+    keep = [a for a in anchors if all(abs(a[0] - f[0]) > FIELD_ANCHOR_RADIUS_M for f in field)]
+    return keep + field
+
+
 def km_mapping(p, s, jkm, anchors=None):
     """Chain distance (m) -> official mileage (km), interpolated between interchange numbers.
 
@@ -450,9 +475,10 @@ def main():
                            for a, b in zip(smp["p"][:-1], smp["p"][1:])
                            if (a, b) in chain_way.index])
         ch["name"] = names.value_counts().index[0] if len(names) else ""
-        f = km_mapping(smp["p"], smp["s"], jkm,
-                       anchors_on_chain(ch["ref"], smp["x"], smp["y"], smp["s"], centres))
         ch["direction"] = direction_name(ch["ref"], smp["x"], smp["y"])
+        anchors = anchors_on_chain(ch["ref"], smp["x"], smp["y"], smp["s"], centres)
+        anchors = field_anchors(ch["ref"], ch["direction"], smp["x"], smp["y"], smp["s"], anchors)
+        f = km_mapping(smp["p"], smp["s"], jkm, anchors)
         ch["km_source"] = "interchange"
         if ch["kind"] == "main":
             if f is None:
