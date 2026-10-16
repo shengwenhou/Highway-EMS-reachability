@@ -51,6 +51,10 @@ ONEWAY_FIX = {
     317134259: "-1",   # 國3 白河交流道南下出口 (OSM drew it as an entrance; 高公局 diagram 03-311)
     317134263: "-1",
 }
+# Ways whose presence was confirmed on the ground; warn if an OSM update drops or restricts them.
+# 高公局聯絡道: two-way link between the 國1 北上 (34.1K) and 南下 (34.3K) bus bays at the Freeway
+# Bureau, used by 五股分隊 to turn round (五股分隊 internal map, 2026-10). See VERIFY.md section 一.
+VERIFIED_LINKS = {136861416: "高公局聯絡道", 136861459: "高公局聯絡道", 1096877797: "高公局聯絡道"}
 SNAP_SPEED_KMH = 20      # station -> nearest graph node, straight-line
 SAMPLE_STEP_M = 100      # resolution used to find the worst point inside each 1-km segment
 
@@ -78,6 +82,13 @@ def load_ways():
                 ways[e["id"]] = e
     print(f"{len(ways)} ways")
     return ways
+
+
+def check_verified_links(ways):
+    for wid, name in VERIFIED_LINKS.items():
+        t = ways.get(wid, {}).get("tags")
+        if t is None or t.get("access") in ("no", "private") or t.get("motor_vehicle") in ("no", "private"):
+            print(f"WARNING: verified link {name} (way {wid}) is missing or restricted in this OSM extract")
 
 
 def build_graph(ways):
@@ -390,6 +401,7 @@ def km_from_main(sb, mains):
 
 def main():
     ways = load_ways()
+    check_verified_links(ways)
     nodes, edges = build_graph(ways)
     keep = giant_scc(nodes, edges)
     edges = edges[keep[edges.u.values] & keep[edges.v.values]].reset_index(drop=True)
