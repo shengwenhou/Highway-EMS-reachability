@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="utf-8">
+<title>五楊高架派遣動畫：路線範例</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@500;700;900&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+:root { --bg: #0b1220; --fg: #eef3f8; --muted: #93a4b8; --amb: #ff4d4d; --via: #ffb547; --road: #4fd1c5; }
+html, body { margin: 0; width: 1920px; height: 1080px; overflow: hidden; background: var(--bg); color: var(--fg);
+  font-family: "Noto Sans TC", sans-serif; }
+canvas { display: block; }
+#labels { position: absolute; inset: 0; pointer-events: none; }
+.lab { position: absolute; transform: translate(-50%, -130%); white-space: nowrap; font-size: 26px; font-weight: 700;
+  padding: 4px 12px; border-radius: 8px; background: rgba(11, 18, 32, .78); border: 1px solid rgba(255,255,255,.18); }
+.lab.st { color: #ffd2a6; }
+.lab.ic { color: var(--via); font-size: 22px; }
+.lab.acc { color: #fff; background: var(--amb); border-color: var(--amb); }
+.lab.cty { background: none; border: 0; color: rgba(238,243,248,.35); font-size: 40px; font-weight: 900; letter-spacing: .3em; transform: translate(-50%, -50%); }
+#tag { position: absolute; left: 56px; top: 44px; font-size: 30px; font-weight: 900; padding: 8px 18px; border-radius: 10px;
+  background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.2); }
+#timer { position: absolute; right: 56px; top: 44px; display: grid; gap: 2px; text-align: right; padding: 14px 22px; border-radius: 12px;
+  background: rgba(11, 18, 32, .82); border: 1px solid rgba(255,255,255,.18); }
+#timer .k { font-size: 22px; color: var(--muted); font-weight: 700; }
+#timer .v { font-family: "IBM Plex Mono", monospace; font-size: 56px; color: var(--amb); line-height: 1.1; }
+#sub { position: absolute; left: 50%; bottom: 64px; transform: translateX(-50%); font-size: 40px; font-weight: 700; text-align: center;
+  padding: 10px 28px; border-radius: 12px; background: rgba(0,0,0,.55); text-shadow: 0 2px 6px rgba(0,0,0,.6); white-space: nowrap; }
+</style>
+</head>
+<body>
+<div id="labels"></div>
+<div id="tag"></div>
+<div id="timer"><div class="k" id="tk"></div><div class="v" id="clock">00:00</div></div>
+<div id="sub"></div>
+<script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }</script>
+<script type="module">
+import * as THREE from "three";
+
+const D = await (await fetch("samples/scene_data.json")).json();
+const H = 0.32;                 // viaduct deck height in km (exaggerated about 10x so it reads at this scale)
+const V = (p, h = 0) => new THREE.Vector3(p[0], h, -p[1]);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(1);
+renderer.setSize(1920, 1080);
+document.body.prepend(renderer.domElement);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0b1220);
+scene.fog = new THREE.Fog(0x0b1220, 25, 60);
+const camera = new THREE.PerspectiveCamera(38, 1920 / 1080, 0.05, 200);
+scene.add(new THREE.HemisphereLight(0xbcd3ff, 0x0b1220, 1.0));
+const sun = new THREE.DirectionalLight(0xffffff, 1.2);
+sun.position.set(-10, 20, 8);
+scene.add(sun);
+
+// ground and counties
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(200, 200), new THREE.MeshLambertMaterial({ color: 0x111b2e }));
+ground.rotation.x = -Math.PI / 2;
+ground.position.y = -0.01;
+scene.add(ground);
+const CTY = { "桃園市": 0x1b2c4a, "新北市": 0x1d3a3a, "臺北市": 0x2a2a48 };
+for (const c of D.counties) {
+  const shape = new THREE.Shape(c.ring.map((p) => new THREE.Vector2(p[0], p[1])));
+  const m = new THREE.Mesh(new THREE.ShapeGeometry(shape), new THREE.MeshLambertMaterial({ color: CTY[c.name] }));
+  m.rotation.x = -Math.PI / 2;
+  scene.add(m);
+  const edge = new THREE.Line(new THREE.BufferGeometry().setFromPoints(c.ring.map((p) => V(p, 0.004))),
+    new THREE.LineBasicMaterial({ color: 0x8fb3ff, transparent: true, opacity: 0.45 }));
+  scene.add(edge);
+}
+
+// flat ribbon along a 3D polyline
+function ribbon(pts, w, mat) {
+  const pos = [], idx = [];
+  for (let i = 0; i < pts.length; i++) {
+    const a = pts[Math.max(0, i - 1)], b = pts[Math.min(pts.length - 1, i + 1)];
+    const d = new THREE.Vector3().subVectors(b, a).setY(0).normalize();
+    const n = new THREE.Vector3(-d.z, 0, d.x).multiplyScalar(w / 2);
+    pos.push(pts[i].x + n.x, pts[i].y, pts[i].z + n.z, pts[i].x - n.x, pts[i].y, pts[i].z - n.z);
+    if (i) idx.push(2 * i - 2, 2 * i - 1, 2 * i, 2 * i - 1, 2 * i + 1, 2 * i);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+  g.setIndex(idx);
+  g.computeVertexNormals();
+  return new THREE.Mesh(g, mat);
+}
+const matRoad = new THREE.MeshBasicMaterial({ color: 0x2f8f88, side: THREE.DoubleSide });
+const matVia = new THREE.MeshLambertMaterial({ color: 0xffb547, emissive: 0x6b3d00, side: THREE.DoubleSide });
+const matPier = new THREE.MeshLambertMaterial({ color: 0x8a7a66 });
+for (const r of D.roads) {
+  if (r.viaduct) {
+    const pts = r.pts.map((p) => V(p, H));
+    scene.add(ribbon(pts, 0.09, matVia));
+    for (let i = 0; i < r.pts.length; i += 4) {          // a pier every 400 m
+      const pier = new THREE.Mesh(new THREE.BoxGeometry(0.025, H, 0.025), matPier);
+      pier.position.copy(V(r.pts[i], H / 2));
+      scene.add(pier);
+    }
+  } else {
+    scene.add(ribbon(r.pts.map((p) => V(p, 0.006)), r.ref === "1" ? 0.07 : 0.05, matRoad));
+  }
+}
+
+// stations
+const stGeo = new THREE.CylinderGeometry(0.05, 0.05, 0.12, 12);
+for (const s of D.stations) {
+  const hero = s.name.includes(D.meta.station);
+  const m = new THREE.Mesh(stGeo, new THREE.MeshLambertMaterial({ color: hero ? 0xffa64d : 0x8a5a3a, emissive: hero ? 0x7a3a00 : 0 }));
+  m.position.copy(V(s.p, 0.06));
+  if (hero) m.scale.setScalar(2.2);
+  scene.add(m);
+}
+
+// ambulance route from the road model: every vertex has the model's elapsed seconds
+const R = D.route;
+const path = R.pts.map((p) => V(p));
+const sec = R.sec;
+const T_END = sec[sec.length - 1];
+// deck height: on the viaduct, and a ramp climbing over the RAMP km before each stretch of deck
+const RAMP = 0.9;
+const pc = [0];
+for (let i = 1; i < path.length; i++) pc.push(pc[i - 1] + path[i].distanceTo(path[i - 1]));
+let nextDeck = Infinity;
+for (let i = path.length - 1; i >= 0; i--) {
+  if (R.viaduct[i]) { nextDeck = pc[i]; path[i].y = H; continue; }
+  path[i].y = Math.max(0, 1 - (nextDeck - pc[i]) / RAMP) * H;
+}
+const total = pc[pc.length - 1];
+const deckStart = pc[R.viaduct.findIndex((v, i) => v && R.viaduct.slice(i, i + 5).every(Boolean))];
+// the route on surface roads and other freeways, drawn as a pale road
+scene.add(ribbon(path.filter((p, i) => pc[i] <= deckStart).map((p) => p.clone().setY(p.y + 0.008)), 0.045,
+  new THREE.MeshBasicMaterial({ color: 0x9fb4cc, side: THREE.DoubleSide })));
+
+const amb = new THREE.Group();
+amb.add(new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.08, 0.07), new THREE.MeshLambertMaterial({ color: 0xffffff, emissive: 0x444444 })));
+const beacon = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.03, 0.06), new THREE.MeshBasicMaterial({ color: 0xff3b3b }));
+beacon.position.y = 0.055;
+amb.add(beacon);
+const glow = new THREE.PointLight(0xff4d4d, 2, 1.2);
+glow.position.y = 0.15;
+amb.add(glow);
+scene.add(amb);
+let trail = null;
+const trailMat = new THREE.MeshBasicMaterial({ color: 0xff4d4d, side: THREE.DoubleSide, transparent: true, opacity: 0.85 });
+
+const accPos = path[path.length - 1];
+const acc = new THREE.Mesh(new THREE.RingGeometry(0.12, 0.17, 40), new THREE.MeshBasicMaterial({ color: 0xff3b3b, side: THREE.DoubleSide, transparent: true }));
+acc.rotation.x = -Math.PI / 2;
+acc.position.copy(accPos).setY(H + 0.01);
+scene.add(acc);
+
+// position at model time s (seconds since dispatch)
+function atTime(s) {
+  let i = sec.findIndex((c) => c >= s);
+  if (i <= 0) return { p: path[0].clone(), d: path[1].clone().sub(path[0]), k: 0 };
+  const f = (s - sec[i - 1]) / (sec[i] - sec[i - 1] || 1);
+  return { p: path[i - 1].clone().lerp(path[i], f), d: path[i].clone().sub(path[i - 1]), k: i };
+}
+
+// labels
+const LAB = document.getElementById("labels");
+const labels = [];
+function label(text, pos, cls) { const el = document.createElement("div"); el.className = "lab " + cls; el.textContent = text; LAB.appendChild(el); labels.push({ el, pos }); }
+for (const [text, p, cls] of D.labels) label(text, V(p, cls === "st" ? 0.35 : 0.3), cls);
+label("事故點　五股前 30.5K", accPos.clone().setY(H + 0.25), "acc");
+label("桃 園 市", V([-3.5, -1.5]), "cty");
+label("新 北 市", V([9, 4.5]), "cty");
+document.getElementById("tk").textContent = `${D.meta.station} 出發後`;
+document.getElementById("tag").textContent = "範例 B（修正版）：模型路線、平穩鏡頭";
+
+const ease = (x) => x < 0.5 ? 2 * x * x : 1 - Math.pow(-2 * x + 2, 2) / 2;
+const smooth = (x) => x * x * (3 - 2 * x);
+const clamp = (x) => Math.min(1, Math.max(0, x));
+const SUBS = [[0, 0.2, "新北市隆恩分隊接到派遣，從三峽出發"],
+  [0.2, 0.62, "經國道 3 號、國道 2 號，到大竹交流道迴轉，再到機場系統"],
+  [0.62, 1.01, "從機場系統開上五楊高架，再往北開到五股"]];
+
+// Camera: a drone that never turns with the ambulance. It keeps a fixed compass bearing (from the
+// south-south-west, looking north-north-east), follows a smoothed position, and changes framing
+// only slowly. Frames must be rendered in order (the smoothing is a per-frame filter).
+const cam = { target: null, dist: 0, hgt: 0, last: -1 };
+const AZ = THREE.MathUtils.degToRad(200);           // where the camera sits, seen from the target
+const WIDE = { target: new THREE.Vector3(5, 0, -1), dist: 15, hgt: 20 };
+
+window.frame = (t) => {
+  if (t <= cam.last) { cam.target = null; }          // restart the filter when rendering from the top
+  cam.last = t;
+  // travel: hold 8%, move at constant model speed (ease only at the ends), hold 4% at the end
+  const m = clamp((t - 0.08) / 0.88);
+  const s = T_END * (m < 0.04 ? 0.04 * smooth(m / 0.04) * (m / 0.04) : m);
+  const { p, d, k } = atTime(Math.min(s, T_END));
+  amb.position.copy(p).setY(p.y + 0.04);
+  amb.rotation.y = Math.atan2(-d.z, d.x);
+  beacon.material.color.setHex(Math.floor(t * 60) % 2 ? 0xff3b3b : 0x3b7bff);
+  if (trail) { scene.remove(trail); trail.geometry.dispose(); }
+  const tp = [...path.slice(0, Math.max(1, k)), p].map((q) => q.clone().setY(q.y + 0.012));
+  if (tp.length > 1) { trail = ribbon(tp, 0.035, trailMat); scene.add(trail); }
+  acc.scale.setScalar(1 + 0.3 * Math.sin(t * 50));
+  acc.material.opacity = 0.65 + 0.35 * Math.sin(t * 50);
+
+  const secs = Math.round(Math.min(s, T_END));
+  document.getElementById("clock").textContent = `${String(Math.floor(secs / 60)).padStart(2, "0")}:${String(secs % 60).padStart(2, "0")}`;
+  document.getElementById("sub").textContent = SUBS.find(([a, b]) => t >= a && t < b)[2];
+
+  // framing: high and far over the surface leg, lower and closer on the deck
+  const onDeck = smooth(clamp((pc[Math.max(0, k - 1)] - deckStart + 1.5) / 4));
+  const goal = { target: p.clone().setY(0), dist: 7 - 3.2 * onDeck, hgt: 6.5 - 4.2 * onDeck };
+  const intro = smooth(clamp((t - 0.06) / 0.12));      // wide establishing shot -> follow
+  const want = {
+    target: WIDE.target.clone().lerp(goal.target, intro),
+    dist: WIDE.dist + (goal.dist - WIDE.dist) * intro,
+    hgt: WIDE.hgt + (goal.hgt - WIDE.hgt) * intro,
+  };
+  if (!cam.target) Object.assign(cam, { target: want.target.clone(), dist: want.dist, hgt: want.hgt });
+  const a = 0.08;                                       // per-frame smoothing (≈0.4 s lag at 30 fps)
+  cam.target.lerp(want.target, a);
+  cam.dist += (want.dist - cam.dist) * a;
+  cam.hgt += (want.hgt - cam.hgt) * a;
+  camera.position.set(cam.target.x + Math.sin(AZ) * cam.dist, cam.hgt, cam.target.z - Math.cos(AZ) * cam.dist);
+  camera.lookAt(cam.target.x, H * onDeck * 0.8, cam.target.z);
+  amb.scale.setScalar(Math.max(1, cam.dist / 3.5));     // stays visible in the high, far shots
+  renderer.render(scene, camera);
+
+  for (const l of labels) {
+    const v = l.pos.clone().project(camera);
+    const vis = v.z < 1 && Math.abs(v.x) < 1.1 && Math.abs(v.y) < 1.1;
+    l.el.style.display = vis ? "block" : "none";
+    l.el.style.left = ((v.x + 1) / 2 * 1920) + "px";
+    l.el.style.top = ((1 - v.y) / 2 * 1080) + "px";
+  }
+};
+await document.fonts.ready;
+window.frame(0);
+window.ready = true;
+</script>
+</body>
+</html>

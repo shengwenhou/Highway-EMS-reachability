@@ -5,3 +5,6 @@ data/processed/
 
 # local screenshots
 /page*.png
+
+# rendered films (too large for git; rebuild with video/render_film.js + video/assemble.py)
+video/wuyang_ems*.mp4
