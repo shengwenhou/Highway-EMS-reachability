@@ -40,6 +40,9 @@ SOURCES = {
     114: "https://opdadm.moi.gov.tw/api/v1/no-auth/resource/api/dataset/FCD9C2D4-CB71-4EAA-AA4C-B088E5FE3157/resource/EF9B9192-7E4D-4E48-BF8A-AA3D4B298788/download",
 }
 YEARS = len(SOURCES)
+# 優先改善 quadrants: default thresholds (≈ top quarter of each); the page lets readers move them
+PRIORITY_RATE = 2.0        # A1+A2 crashes per km per year
+PRIORITY_RESP_MIN = 8.0    # median ambulance response time over the stretch, minutes
 BIN_KM = 5                 # stretch length the rate is computed over (see README for the choice)
 MIN_TAIL_KM = 2.5          # a shorter last stretch is merged into the one before it
 COLS = ["發生日期", "發生時間", "事故類別名稱", "處理單位名稱警局層", "發生地點",
@@ -183,6 +186,10 @@ def bins(points, crash):
                 "ramp_share": round(float(cc.ramp.mean()), 2) if len(cc) else 0.0,
                 "rate": round(len(cc) / length / YEARS, 2),
                 "county": pts.county.mode().iloc[0] if pts.county.notna().any() else "",
+                # ambulance response over the stretch (minutes, from the routing model)
+                "resp_med_min": round(float(pts.time_min.median()), 1),
+                "resp_max_min": round(float(pts.time_min.max()), 1),
+                "resp_station": pts.station_time.mode().iloc[0] if pts.station_time.notna().any() else "",
                 "coords": pts[["lon", "lat"]].round(5).values.tolist(),
             })
     return pd.DataFrame(rows)
@@ -220,9 +227,11 @@ def page(b, crash, counties, breaks, stats):
     cty["geometry"] = cty.geometry.simplify(0.003)
     data = {
         "breaks": breaks, "years": [min(SOURCES), max(SOURCES)], "bin_km": BIN_KM, "stats": stats,
+        "priority": {"rate": PRIORITY_RATE, "resp": PRIORITY_RESP_MIN},
         "counties": json.loads(cty[["COUNTYNAME", "geometry"]].to_json()),
         "bins": [[r.ref, r.direction, r.kind == "main", r.road_name, r.km_from, r.km_to, r.length_km, r.crashes,
-                  r.a1, r.deaths, r.injuries, r.rate, r.county, [v for xy in r.coords[::2] + [r.coords[-1]] for v in xy]]
+                  r.a1, r.deaths, r.injuries, r.rate, r.county, [v for xy in r.coords[::2] + [r.coords[-1]] for v in xy],
+                  r.resp_med_min, r.resp_max_min, r.resp_station.split("消防局")[-1]]
                  for r in b.itertuples()],
     }
     tpl = (ROOT / "scripts" / "crash_template.html").read_text()
