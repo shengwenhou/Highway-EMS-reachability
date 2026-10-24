@@ -109,7 +109,7 @@ footer ul { margin: 0; padding-left: 1.2em; display: grid; gap: 4px; }
     <div class="notice">
       <div><b>只含 A1、A2 事故。</b>A1 是 24 小時內有人死亡、A2 是有人受傷；只有財損的 A3 事故沒有公開逐案資料，所以實際事故件數遠多於此圖。</div>
       <div><b>沒有推論救護分隊。</b>原始資料只記錄處理的警察單位，沒有記錄是哪個消防分隊出勤，所以本頁不推斷救護派遣。</div>
-      <div><b>未依車流量調整。</b>發生率是「每公里每年的事故件數」，車多的路段自然事故也多；這不等於「每百萬車公里」的肇事率。</div>
+      <div><b>兩種發生率。</b>「每億車公里」依高公局各路段的日交通量調整，代表<b>每一趟車程</b>出事的風險；「每公里每年」沒有調整，代表事故在路上的<b>密度</b>，也就是救護車要跑的次數，車多的路段自然比較高。上方可以切換。</div>
     </div>
   </header>
 
@@ -122,6 +122,12 @@ footer ul { margin: 0; padding-left: 1.2em; display: grid; gap: 4px; }
         <button type="button" data-view="prio" aria-pressed="false">優先改善</button>
       </span>
     </div>
+    <div><span class="ctl-label">發生率</span>
+      <span class="seg" role="group" aria-label="發生率">
+        <button type="button" data-metric="vkm" aria-pressed="true">每億車公里</button>
+        <button type="button" data-metric="km" aria-pressed="false">每公里每年</button>
+      </span>
+    </div>
     <div><span class="ctl-label">方向</span>
       <span class="seg" role="group" aria-label="方向">
         <button type="button" data-dir="all" aria-pressed="true">雙向</button>
@@ -132,9 +138,9 @@ footer ul { margin: 0; padding-left: 1.2em; display: grid; gap: 4px; }
   </div>
 
   <div class="prio" id="prio" hidden>
-    <div class="notice" style="border-left-color: var(--q-hot)"><div><b>優先改善＝事故多、救護車又慢的路段。</b>每 5 公里一段，依「事故發生率」與「救護車反應時間（該段中位數）」分成四類。門檻預設約為全國前四分之一，可以拖動調整。反應時間來自本專案的路網模型（不塞車、不含出勤準備時間），發生率未依車流量調整。</div></div>
+    <div class="notice" style="border-left-color: var(--q-hot)"><div><b>優先改善＝事故多、救護車又慢的路段。</b>每 5 公里一段，依「事故發生率」與「救護車反應時間（該段中位數）」分成四類。門檻預設約為全國前四分之一，可以拖動調整。發生率預設用「每億車公里」，也就是扣掉車流量的影響；切到「每公里每年」則是看事故密度。反應時間來自本專案的路網模型（不塞車、不含出勤準備時間）。</div></div>
     <div class="sliders">
-      <label>事故發生率門檻：<b id="v-rate"></b> 件／公里／年<input type="range" id="s-rate" min="0.5" max="6" step="0.1"></label>
+      <label>事故發生率門檻：<b id="v-rate"></b> <span id="u-rate"></span><input type="range" id="s-rate"></label>
       <label>反應時間門檻：<b id="v-resp"></b> 分鐘<input type="range" id="s-resp" min="3" max="14" step="0.5"></label>
       <button type="button" id="s-reset">恢復預設</button>
     </div>
@@ -157,7 +163,7 @@ footer ul { margin: 0; padding-left: 1.2em; display: grid; gap: 4px; }
   <footer>
     <div><b>計算方式</b></div>
     <ul id="method"></ul>
-    <div>資料：內政部警政署「傷亡道路交通事故資料」（政府資料開放授權條款第 1 版）、© OpenStreetMap contributors、taiwan-atlas 縣市界。逐案資料存在 <code>output/crashes_freeway.csv</code>，分段結果在 <code>output/crash_bins.csv</code>。</div>
+    <div>資料：內政部警政署「傷亡道路交通事故資料」、交通部高速公路局「交通量參考值」與「交流道、服務區里程一覽表」（政府資料開放授權條款第 1 版）、© OpenStreetMap contributors、taiwan-atlas 縣市界。逐案資料存在 <code>output/crashes_freeway.csv</code>，分段結果在 <code>output/crash_bins.csv</code>，各路段交通量在 <code>output/traffic_sections.csv</code>。</div>
   </footer>
 </div>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
@@ -165,19 +171,23 @@ footer ul { margin: 0; padding-left: 1.2em; display: grid; gap: 4px; }
 const D = __DATA__;
 const GROUP = { "北上": "北上／東行", "東行": "北上／東行", "南下": "南下／西行", "西行": "南下／西行" };
 const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
-const cls = (v) => D.breaks.filter((b) => v >= b).length;
+const M = D.metrics;
+let metric = "vkm";
+const val = (b) => (metric === "vkm" ? b.rv : b.rate);
+const cls = (v) => M[metric].breaks.filter((b) => v >= b).length;
 const fmt = (v, d = 1) => Number(v).toFixed(d);
 const S = D.stats, Y0 = D.years[0], Y1 = D.years[1], NY = Y1 - Y0 + 1;
 let dir = "all";
 
 document.getElementById("eyebrow").textContent = `民國 ${Y0}–${Y1} 年 · A1＋A2 事故 · 每 ${D.bin_km} 公里一段 · 依行車方向`;
 document.getElementById("lede").textContent =
-  `國道公路警察局處理的 A1、A2 交通事故，依「發生地點」記載的國道、方向與里程，放到對應的車道上，每 ${D.bin_km} 公里一段計算「每公里每年的事故件數」。顏色由綠到紫，代表發生率由低到高。`;
+  `國道公路警察局處理的 A1、A2 交通事故，依「發生地點」記載的國道、方向與里程，放到對應的車道上，每 ${D.bin_km} 公里一段計算發生率：預設是「每億車公里的事故件數」（依高公局各路段車流量調整），也可以切換成「每公里每年的事故件數」。顏色由綠到紫，代表發生率由低到高。`;
 document.getElementById("tiles").innerHTML = [
   ["A1＋A2 事故", S.crashes.toLocaleString(), `${NY} 年合計，每年約 ${Math.round(S.crashes / NY).toLocaleString()} 件`],
   ["A1 事故", S.a1.toLocaleString(), `占 ${fmt(S.a1 / S.crashes * 100)}%`],
   ["死亡（24 小時內）", S.deaths.toLocaleString(), "人"],
   ["受傷", S.injuries.toLocaleString(), "人"],
+  ["全國平均", fmt(S.rate_vkm), `件／億車公里（${NY} 年共 ${Math.round(S.vkm_million / 100).toLocaleString()} 億車公里）`],
 ].map(([k, v, s]) => `<div class="tile"><div class="k">${k}</div><div class="v">${v}</div><div class="s">${s}</div></div>`).join("");
 
 const map = L.map("map", { zoomSnap: 0.25, preferCanvas: true }).fitBounds([[21.9, 120.0], [25.3, 122.0]]);
@@ -185,25 +195,26 @@ map.attributionControl.setPrefix(false).addAttribution("© OpenStreetMap contrib
 const county = L.geoJSON(D.counties, { interactive: false, style: () => ({}) }).addTo(map);
 const canvas = L.canvas({ padding: 0.3, tolerance: 6 });
 const layer = L.layerGroup().addTo(map);
-const bins = D.bins.map(([ref, d, main, road, k0, k1, len, n, a1, dead, inj, rate, cty, flat, rmed, rmax, rst]) => {
+const bins = D.bins.map(([ref, d, main, road, k0, k1, len, n, a1, dead, inj, rate, cty, flat, rmed, rmax, rst, adt, rv]) => {
   const ll = [];
   for (let i = 0; i < flat.length; i += 2) ll.push([flat[i + 1], flat[i]]);
-  return { ref, d, main, road, k0, k1, len, n, a1, dead, inj, rate, cty, ll, rmed, rmax, rst };
+  return { ref, d, main, road, k0, k1, len, n, a1, dead, inj, rate, cty, ll, rmed, rmax, rst, adt, rv };
 });
 let view = "rate";
-const thr = { rate: D.priority.rate, resp: D.priority.resp };
+const thr = { vkm: M.vkm.thr, km: M.km.thr, resp: D.priority.resp };
 const QUAD = {
   hot: { name: "事故多、救護慢（優先改善）", v: "--q-hot" },
   busy: { name: "事故多、救護快", v: "--q-busy" },
   slow: { name: "事故少、救護慢", v: "--q-slow" },
   ok: { name: "事故少、救護快", v: "--q-ok" },
 };
-const quad = (b) => (b.rate >= thr.rate ? (b.rmed >= thr.resp ? "hot" : "busy") : (b.rmed >= thr.resp ? "slow" : "ok"));
+const quad = (b) => (val(b) >= thr[metric] ? (b.rmed >= thr.resp ? "hot" : "busy") : (b.rmed >= thr.resp ? "slow" : "ok"));
 const shownBins = () => bins.filter((b) => dir === "all" || GROUP[b.d] === dir);
 function popup(b) {
   return `<div class="pop"><h3>國道${b.ref} ${b.d} ${fmt(b.k0)}K–${fmt(b.k1)}K</h3>` +
     (b.main ? "" : `<div class="s">${b.road}</div>`) +
-    `<div>發生率 <span class="v">${fmt(b.rate, 2)}</span> 件／公里／年</div>` +
+    `<div>發生率 <span class="v">${fmt(b.rv)}</span> 件／億車公里・<span class="v">${fmt(b.rate, 2)}</span> 件／公里／年</div>` +
+    `<div class="s">本方向日交通量約 ${fmt(b.adt / 10000)} 萬輛</div>` +
     `<div>${NY} 年共 <span class="v">${b.n}</span> 件（A1 ${b.a1} 件）</div>` +
     `<div>死亡 <span class="v">${b.dead}</span> 人・受傷 <span class="v">${b.inj}</span> 人</div>` +
     `<div>救護反應 <span class="v">${fmt(b.rmed)}</span> 分（中位數，最久 ${fmt(b.rmax)} 分）</div>` +
@@ -215,8 +226,8 @@ function draw() {
   layer.clearLayers();
   const prio = view === "prio";
   document.getElementById("prio").hidden = !prio;   // before scatter(), which measures its box
-  const col = prio ? (b) => css(QUAD[quad(b)].v) : (b) => css("--c" + cls(b.rate));
-  const order = prio ? (b) => ["ok", "slow", "busy", "hot"].indexOf(quad(b)) : (b) => b.rate;
+  const col = prio ? (b) => css(QUAD[quad(b)].v) : (b) => css("--c" + cls(val(b)));
+  const order = prio ? (b) => ["ok", "slow", "busy", "hot"].indexOf(quad(b)) : (b) => val(b);
   shownBins().sort((a, b) => order(a) - order(b)).forEach((b) => {
     b.line = L.polyline(b.ll, { renderer: canvas, color: col(b), weight: prio && quad(b) === "hot" ? 6 : 4, lineCap: "butt", opacity: 1 })
       .bindPopup(() => popup(b)).addTo(layer);
@@ -228,14 +239,15 @@ function draw() {
       ["hot", "busy", "slow", "ok"].map((q) => `<div class="row"><span class="sw" style="background:${css(QUAD[q].v)}"></span>${QUAD[q].name} <span class="qcount">${cnt[q] || 0}</span></div>`).join("");
     scatter();
   } else {
-    const e = D.breaks;
+    const e = M[metric].breaks;
     const labels = [`< ${e[0]}`, ...e.slice(0, -1).map((a, i) => `${a}–${e[i + 1]}`), `≥ ${e[e.length - 1]}`];
-    document.getElementById("legend").innerHTML = `<div class="t">每公里每年 A1＋A2 件數</div>` +
+    document.getElementById("legend").innerHTML = `<div class="t">${M[metric].legend}</div>` +
       labels.slice().reverse().map((l, i) => `<div class="row"><span class="sw" style="background:${css("--c" + (4 - i))}"></span>${l}</div>`).join("");
   }
   rank();
   document.querySelectorAll("[data-dir]").forEach((b) => b.setAttribute("aria-pressed", b.dataset.dir === dir));
   document.querySelectorAll("[data-view]").forEach((b) => b.setAttribute("aria-pressed", b.dataset.view === view));
+  document.querySelectorAll("[data-metric]").forEach((b) => b.setAttribute("aria-pressed", b.dataset.metric === metric));
 }
 function focusBin(b) {
   map.flyToBounds(L.latLngBounds(b.ll).pad(0.6), { duration: 0.6 });
@@ -245,20 +257,20 @@ function scatter() {
   const svg = document.getElementById("scatter"), box = document.getElementById("scatter-box");
   const W = Math.max(300, box.clientWidth - 24), H = Math.round(Math.min(340, Math.max(230, W * 0.42)));
   const m = { l: 42, r: 12, t: 22, b: 34 };
-  const xs = shownBins(), lx = (v) => Math.log(Math.max(v, 0.05));
-  const x0 = lx(0.05), x1 = lx(16), yMax = Math.ceil(Math.max(...bins.map((b) => b.rmed)) / 2) * 2;
+  const A = M[metric].axis, xs = shownBins(), lx = (v) => Math.log(Math.max(v, A.lo));
+  const x0 = lx(A.lo), x1 = lx(A.hi), yMax = Math.ceil(Math.max(...bins.map((b) => b.rmed)) / 2) * 2;
   const X = (v) => m.l + (lx(v) - x0) / (x1 - x0) * (W - m.l - m.r);
   const Y = (v) => H - m.b - v / yMax * (H - m.t - m.b);
   svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
   let g = `<g class="ax">`;
-  [0.1, 0.25, 0.5, 1, 2, 4, 8, 16].forEach((t) => { g += `<line x1="${X(t)}" x2="${X(t)}" y1="${m.t}" y2="${H - m.b}"/><text x="${X(t)}" y="${H - m.b + 14}" text-anchor="middle">${t}</text>`; });
+  A.ticks.forEach((t) => { g += `<line x1="${X(t)}" x2="${X(t)}" y1="${m.t}" y2="${H - m.b}"/><text x="${X(t)}" y="${H - m.b + 14}" text-anchor="middle">${t}</text>`; });
   for (let v = 0; v <= yMax; v += 2) g += `<line x1="${m.l}" x2="${W - m.r}" y1="${Y(v)}" y2="${Y(v)}"/><text x="${m.l - 6}" y="${Y(v) + 4}" text-anchor="end">${v}</text>`;
-  g += `<text x="${(m.l + W - m.r) / 2}" y="${H - 4}" text-anchor="middle">事故發生率（件／公里／年，對數刻度）</text>`;
+  g += `<text x="${(m.l + W - m.r) / 2}" y="${H - 4}" text-anchor="middle">事故發生率（${M[metric].unit}，對數刻度）</text>`;
   g += `<text x="${m.l}" y="${m.t - 10}" text-anchor="start">反應時間（分）</text></g>`;
-  g += `<line class="thr" x1="${X(thr.rate)}" x2="${X(thr.rate)}" y1="${m.t}" y2="${H - m.b}"/><line class="thr" x1="${m.l}" x2="${W - m.r}" y1="${Y(thr.resp)}" y2="${Y(thr.resp)}"/>`;
+  g += `<line class="thr" x1="${X(thr[metric])}" x2="${X(thr[metric])}" y1="${m.t}" y2="${H - m.b}"/><line class="thr" x1="${m.l}" x2="${W - m.r}" y1="${Y(thr.resp)}" y2="${Y(thr.resp)}"/>`;
   g += `<text class="ql" x="${W - m.r - 4}" y="${m.t + 14}" text-anchor="end" fill="${css("--q-hot")}">優先改善</text>`;
   xs.slice().sort((a, b) => ["ok", "slow", "busy", "hot"].indexOf(quad(a)) - ["ok", "slow", "busy", "hot"].indexOf(quad(b))).forEach((b) => {
-    g += `<circle data-i="${bins.indexOf(b)}" cx="${X(b.rate).toFixed(1)}" cy="${Y(b.rmed).toFixed(1)}" r="${quad(b) === "hot" ? 5 : 3.5}" fill="${css(QUAD[quad(b)].v)}" stroke="${css("--surface")}" stroke-width="1.2"/>`;
+    g += `<circle data-i="${bins.indexOf(b)}" cx="${X(val(b)).toFixed(1)}" cy="${Y(b.rmed).toFixed(1)}" r="${quad(b) === "hot" ? 5 : 3.5}" fill="${css(QUAD[quad(b)].v)}" stroke="${css("--surface")}" stroke-width="1.2"/>`;
   });
   svg.innerHTML = g;
   const tip = document.getElementById("stip");
@@ -266,7 +278,7 @@ function scatter() {
     const b = bins[+c.dataset.i];
     c.style.cursor = "pointer";
     c.addEventListener("pointerenter", () => {
-      tip.innerHTML = `<b>國道${b.ref} ${b.d} ${fmt(b.k0, 0)}–${fmt(b.k1, 0)}K</b> ${b.cty}<br>發生率 ${fmt(b.rate, 2)}・反應 ${fmt(b.rmed)} 分`;
+      tip.innerHTML = `<b>國道${b.ref} ${b.d} ${fmt(b.k0, 0)}–${fmt(b.k1, 0)}K</b> ${b.cty}<br>發生率 ${metric === "vkm" ? fmt(b.rv) : fmt(b.rate, 2)}・反應 ${fmt(b.rmed)} 分`;
       const r = svg.getBoundingClientRect(), bx = box.getBoundingClientRect();
       const px = (+c.getAttribute("cx")) / W * r.width + r.left - bx.left, py = (+c.getAttribute("cy")) / H * r.height + r.top - bx.top;
       tip.style.display = "block";
@@ -280,22 +292,24 @@ function scatter() {
 function rank() {
   const prio = view === "prio";
   const list = prio
-    ? shownBins().filter((b) => quad(b) === "hot").sort((a, b) => b.rate * b.rmed - a.rate * a.rmed)
-    : shownBins().sort((a, b) => b.rate - a.rate).slice(0, 15);
+    ? shownBins().filter((b) => quad(b) === "hot").sort((a, b) => val(b) * b.rmed - val(a) * a.rmed)
+    : shownBins().sort((a, b) => val(b) - val(a)).slice(0, 15);
   document.getElementById("rank-title").textContent = prio ? `優先改善的路段（${list.length} 段）` : "發生率最高的路段";
   document.getElementById("rank-note").textContent = prio
-    ? `事故發生率 ≥ ${fmt(thr.rate)} 件／公里／年，且救護反應時間中位數 ≥ ${fmt(thr.resp)} 分鐘；依兩者乘積排序。點一下可在地圖上定位。`
-    : `全部 ${bins.length} 段的中位數是每公里每年 ${fmt(S.median_rate, 2)} 件。點一下可在地圖上定位。`;
+    ? `事故發生率 ≥ ${fmt(thr[metric])} ${M[metric].unit}，且救護反應時間中位數 ≥ ${fmt(thr.resp)} 分鐘；依兩者乘積排序。點一下可在地圖上定位。`
+    : (metric === "vkm"
+      ? `全部 ${bins.length} 段的中位數是每億車公里 ${fmt(S.median_rate_vkm)} 件。點一下可在地圖上定位。`
+      : `全部 ${bins.length} 段的中位數是每公里每年 ${fmt(S.median_rate, 2)} 件。點一下可在地圖上定位。`);
   const ol = document.getElementById("rank");
   ol.innerHTML = "";
   if (prio && !list.length) ol.innerHTML = `<li class="note">目前門檻下沒有同時符合兩個條件的路段。</li>`;
   list.forEach((b, i) => {
     const li = document.createElement("li");
-    const swc = prio ? css(QUAD.hot.v) : css("--c" + cls(b.rate));
+    const swc = prio ? css(QUAD.hot.v) : css("--c" + cls(val(b)));
     li.innerHTML = `<button type="button"><span class="rk">${i + 1}</span>` +
       `<span class="loc">國道${b.ref} ${b.d} ${fmt(b.k0, 0)}–${fmt(b.k1, 0)}K <small>${b.main ? "" : b.road.replace("道路", "") + "・"}${b.cty}</small></span>` +
-      `<span class="val"><span class="sw" style="background:${swc}"></span>${prio ? `${fmt(b.rate, 1)} 件・${fmt(b.rmed)} 分` : fmt(b.rate, 1)}</span>` +
-      `<span class="st">${prio ? `${NY} 年 ${b.n} 件・最快到場：${b.rst}（最久 ${fmt(b.rmax)} 分）` : `${NY} 年 ${b.n} 件・死亡 ${b.dead}・受傷 ${b.inj}`}</span></button>`;
+      `<span class="val"><span class="sw" style="background:${swc}"></span>${prio ? `${fmt(val(b), 1)} 件・${fmt(b.rmed)} 分` : fmt(val(b), 1)}</span>` +
+      `<span class="st">${prio ? `${NY} 年 ${b.n} 件・最快到場：${b.rst}（最久 ${fmt(b.rmax)} 分）` : `${NY} 年 ${b.n} 件・死亡 ${b.dead}・受傷 ${b.inj}・${metric === "vkm" ? `每公里每年 ${fmt(b.rate, 1)} 件` : `每億車公里 ${fmt(b.rv)} 件`}`}</span></button>`;
     li.querySelector("button").addEventListener("click", () => focusBin(b));
     ol.appendChild(li);
   });
@@ -305,22 +319,27 @@ document.getElementById("method").innerHTML = [
   `定位：依「發生地點」文字中的國道編號、方向與公里數（例如「國道1號 38公里900.0公尺處南側向」），放到對應方向的車道。記載「高架」的放在五楊、汐五等高架段，其餘放在平面主線。共 ${S.placed.toLocaleString()} 件（${fmt(S.placed / S.crashes * 100)}%）可以定位；其餘缺里程、缺方向，或不在本專案的國道範圍內（例如國道 2 甲、台 76 線）。`,
   `原始資料雖有經緯度，但大量事故共用同一組座標（例如一整段路只有一個點），所以不用座標定位。`,
   `分段：每條車道依官方里程每 ${D.bin_km} 公里一段（頭尾不足 2.5 公里的併入相鄰段）。1 公里一段時，三年內有六成五的路段少於 5 件，數字起伏太大；10 公里一段則會把交流道附近的熱點抹平。`,
-  `發生率 = 該段事故件數 ÷ 該段長度 ÷ ${NY} 年。交流道匝道上的事故（約占 ${fmt(S.ramp_share * 100, 0)}%）依記載的主線里程計入。本專案的里程是用交流道位置內插，與現場公里牌可能差數百公尺，個別事故可能落到相鄰的一段。`,
-  `限制：未依車流量標準化；不含 A3 財損事故；高架與平面路段若原始記載沒有寫「高架」，會計入平面主線。`,
-  `優先改善：每段的救護反應時間取該段每 100 m 點位的中位數（本專案路網模型，最快分隊、不塞車、不含出勤準備）。預設門檻：發生率 ≥ ${D.priority.rate} 件／公里／年、反應時間 ≥ ${D.priority.resp} 分鐘，各約為全國前四分之一。`,
+  `每公里每年 = 該段事故件數 ÷ 該段長度 ÷ ${NY} 年。交流道匝道上的事故（約占 ${fmt(S.ramp_share * 100, 0)}%）依記載的主線里程計入。本專案的里程是用交流道位置內插，與現場公里牌可能差數百公尺，個別事故可能落到相鄰的一段。`,
+  `每億車公里 = 該段事故件數 ÷ 該段 ${NY} 年的車公里數 × 1 億。車公里數用高公局「交通量參考值」：各交流道間路段、分方向的 ETC 日交通量（每年 5 月非假日的週二至四、週六、週日，以 5:1:1 加權成一週平均），${Y0}–${Y1} 三年依天數加權。每 100 m 點位取所在交流道間路段的交通量，五楊、汐五高架用高架路段的交通量；一段跨過交流道時，依各路段在段內的長度加權。以此估算的全國總車公里（民國 113 年 ${Math.round(S.vkm_check / 100).toLocaleString()} 億）與高公局公布值（${Math.round(S.vkm_official / 100).toLocaleString()} 億）相差 ${fmt((S.vkm_check / S.vkm_official - 1) * 100)}%。`,
+  `限制：交通量只用 5 月的平日與週末，不含連假與春節，可能低估車流較多的路段；交流道里程是官方的整數公里，路段分界可能差數百公尺。件數少的路段（例如三年不到 10 件）發生率起伏大，要一併看件數。不含 A3 財損事故；高架與平面路段若原始記載沒有寫「高架」，會計入平面主線，平面段的每億車公里因此可能偏高、高架段偏低。`,
+  `優先改善：每段的救護反應時間取該段每 100 m 點位的中位數（本專案路網模型，最快分隊、不塞車、不含出勤準備）。預設門檻：發生率 ≥ ${M.vkm.thr} 件／億車公里（或 ≥ ${M.km.thr} 件／公里／年）、反應時間 ≥ ${D.priority.resp} 分鐘，各約為全國前四分之一。`,
 ].map((t) => `<li>${t}</li>`).join("");
 
 document.querySelectorAll("[data-dir]").forEach((b) => b.addEventListener("click", () => { dir = b.dataset.dir; draw(); }));
 document.querySelectorAll("[data-view]").forEach((b) => b.addEventListener("click", () => { view = b.dataset.view; draw(); }));
+document.querySelectorAll("[data-metric]").forEach((b) => b.addEventListener("click", () => { metric = b.dataset.metric; syncSliders(); draw(); }));
 const sRate = document.getElementById("s-rate"), sResp = document.getElementById("s-resp");
 function syncSliders() {
-  sRate.value = thr.rate; sResp.value = thr.resp;
-  document.getElementById("v-rate").textContent = fmt(thr.rate);
+  const sl = M[metric].slider;
+  sRate.min = sl[0]; sRate.max = sl[1]; sRate.step = sl[2];
+  sRate.value = thr[metric]; sResp.value = thr.resp;
+  document.getElementById("v-rate").textContent = fmt(thr[metric]);
+  document.getElementById("u-rate").textContent = M[metric].unit;
   document.getElementById("v-resp").textContent = fmt(thr.resp);
 }
-sRate.addEventListener("input", () => { thr.rate = +sRate.value; syncSliders(); draw(); });
+sRate.addEventListener("input", () => { thr[metric] = +sRate.value; syncSliders(); draw(); });
 sResp.addEventListener("input", () => { thr.resp = +sResp.value; syncSliders(); draw(); });
-document.getElementById("s-reset").addEventListener("click", () => { thr.rate = D.priority.rate; thr.resp = D.priority.resp; syncSliders(); draw(); });
+document.getElementById("s-reset").addEventListener("click", () => { thr.vkm = M.vkm.thr; thr.km = M.km.thr; thr.resp = D.priority.resp; syncSliders(); draw(); });
 syncSliders();
 addEventListener("resize", () => { if (view === "prio") { clearTimeout(window._sc); window._sc = setTimeout(scatter, 150); } });
 if (location.hash === "#priority") view = "prio";
