@@ -13,7 +13,7 @@ const FPS = 30;
   const open = async () => {
     const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
     page.on("pageerror", (e) => console.error("page error:", e.message));
-    await page.goto("http://localhost:8766/film.html");
+    await page.goto("http://127.0.0.1:8766/film.html");
     await page.waitForFunction(() => window.ready === true, null, { timeout: 180000 });
     return page;
   };

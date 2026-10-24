@@ -12,7 +12,7 @@ const path = require("path");
   const browser = await chromium.launch({ args: ["--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"] });
   const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
   page.on("pageerror", (e) => console.error("page error:", e.message));
-  await page.goto(`http://localhost:8766/scene.html?mode=${mode}`);
+  await page.goto(`http://127.0.0.1:8766/scene.html?mode=${mode}`);
   await page.waitForFunction(() => window.ready === true, null, { timeout: 120000 });
   for (let i = 0; i < n; i++) {
     await page.evaluate((t) => window.frame(t), i / (n - 1));
