@@ -1,0 +1,431 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="utf-8">
+<title>五楊高架救護派遣動畫</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@500;700;900&family=Noto+Serif+TC:wght@900&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+:root { --bg: #0b1220; --fg: #eef3f8; --muted: #93a4b8; --amb: #ff4d4d; --via: #ffb547; --ok: #3ddc97; }
+html, body { margin: 0; width: 1920px; height: 1080px; overflow: hidden; background: var(--bg); color: var(--fg);
+  font-family: "Noto Sans TC", sans-serif; }
+canvas { display: block; }
+.layer { position: absolute; inset: 0; pointer-events: none; }
+.lab { position: absolute; transform: translate(-50%, -130%); white-space: nowrap; font-size: 26px; font-weight: 700;
+  padding: 4px 12px; border-radius: 8px; background: rgba(11, 18, 32, .8); border: 1px solid rgba(255,255,255,.18); }
+.lab.st { color: #ffd2a6; }
+.lab.ic { color: var(--via); font-size: 24px; }
+.lab.in { color: #0b1220; background: var(--ok); border-color: var(--ok); font-size: 24px; }
+.lab.acc { color: #fff; background: var(--amb); border-color: var(--amb); }
+.lab.big { font-size: 34px; padding: 8px 18px; }
+.lab.warn { color: #fff; background: #7a1f2b; border-color: #ff6b6b; font-size: 30px; }
+.lab.cty { background: none; border: 0; color: rgba(238,243,248,.42); font-size: 46px; font-weight: 900; letter-spacing: .3em; transform: translate(-50%, -50%); }
+.lab.place { background: none; border: 0; color: rgba(238,243,248,.75); font-size: 26px; transform: translate(-50%, -50%); text-shadow: 0 2px 6px #000; }
+.lab.level { font-size: 30px; }
+.lab.level.via { color: var(--via); }
+.lab.level.gnd { color: #6fe0d6; }
+.card { position: absolute; opacity: 0; }
+#title { inset: 0; display: grid; place-content: center; text-align: center; gap: 18px; background: rgba(11,18,32,.55); }
+#title h1 { font-family: "Noto Serif TC", serif; font-size: 84px; margin: 0; line-height: 1.25; }
+#title p { font-size: 34px; color: var(--muted); margin: 0; }
+#end { inset: 0; display: grid; place-content: center; gap: 22px; background: rgba(11,18,32,.88); padding: 0 220px; }
+#end h2 { font-size: 48px; margin: 0; }
+#end ul { margin: 0; padding-left: 1.2em; font-size: 28px; line-height: 1.6; color: #c9d5e3; }
+#sub { position: absolute; left: 50%; bottom: 60px; transform: translateX(-50%); font-size: 44px; font-weight: 700; text-align: center;
+  padding: 10px 30px; border-radius: 12px; background: rgba(0,0,0,.6); text-shadow: 0 2px 6px rgba(0,0,0,.6); white-space: nowrap; }
+#sub:empty { display: none; }
+#race { left: 56px; top: 48px; display: grid; gap: 10px; padding: 18px 24px; border-radius: 14px;
+  background: rgba(11,18,32,.86); border: 1px solid rgba(255,255,255,.18); min-width: 520px; }
+#race .h { font-size: 24px; color: var(--muted); font-weight: 700; }
+#race .row { display: grid; grid-template-columns: 22px 1fr auto; align-items: center; gap: 14px; font-size: 32px; font-weight: 700; }
+#race .dot { width: 18px; height: 18px; border-radius: 50%; }
+#race .t { font-family: "IBM Plex Mono", monospace; font-size: 46px; }
+#race .row small { font-size: 22px; color: var(--muted); font-weight: 500; margin-left: 8px; }
+#race .row.done .t::after { content: " ✓"; color: var(--ok); font-size: 34px; }
+#rank { left: 56px; top: 330px; padding: 18px 24px; border-radius: 14px; background: rgba(11,18,32,.86);
+  border: 1px solid rgba(255,255,255,.18); font-size: 30px; line-height: 1.6; max-width: 760px; }
+#rank b { color: var(--amb); font-size: 40px; }
+#legend { left: 56px; top: 48px; padding: 16px 22px; border-radius: 14px; background: rgba(11,18,32,.86);
+  border: 1px solid rgba(255,255,255,.18); display: grid; gap: 6px; font-size: 26px; font-weight: 700; }
+#legend .h { font-size: 24px; color: var(--muted); }
+#legend .r { display: flex; align-items: center; gap: 12px; }
+#legend .sw { width: 34px; height: 12px; border-radius: 6px; }
+#bars { right: 56px; top: 48px; width: 980px; padding: 28px 36px; border-radius: 18px;
+  background: rgba(11,18,32,.9); border: 1px solid rgba(255,255,255,.2); display: grid; gap: 16px; }
+#bars .h { font-size: 30px; font-weight: 900; }
+#bars .r { display: grid; grid-template-columns: 330px 1fr 130px; align-items: center; gap: 18px; font-size: 32px; font-weight: 700; }
+#bars .bar { height: 34px; border-radius: 8px; width: 0; }
+#bars .v { font-family: "IBM Plex Mono", monospace; text-align: right; }
+#bars .tag { font-size: 22px; padding: 2px 10px; border-radius: 999px; margin-left: 10px; vertical-align: 4px; }
+#bars .note { font-size: 24px; color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="layer" id="labels"></div>
+<div class="layer">
+  <div class="card" id="title"><h1>五楊高架上的救護車</h1><p>為什麼離事故最近的，不一定是最快到的？</p></div>
+  <div class="card" id="race"></div>
+  <div class="card" id="rank"></div>
+  <div class="card" id="legend"></div>
+  <div class="card" id="bars"></div>
+  <div class="card" id="end">
+    <h2>資料與限制</h2>
+    <ul>
+      <li>路網：© OpenStreetMap contributors（開放街圖），2026 年 10 月擷取</li>
+      <li>消防分隊：內政部消防署「救援與應變單位點位」</li>
+      <li>時間為模型估算：依速限計算、不塞車、不含出勤準備（約 1–1.5 分鐘）</li>
+      <li>派遣做法為口頭得知，沒有正式文件</li>
+      <li>計算方式與程式：github.com/shengwenhou/Highway-EMS-reachability</li>
+    </ul>
+  </div>
+  <div id="sub"></div>
+</div>
+<script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }</script>
+<script type="module">
+import * as THREE from "three";
+
+const D = await (await fetch("data/film.json")).json();
+const H = 0.32;                                   // viaduct height in km (exaggerated about 10x)
+const V = (p, h = 0) => new THREE.Vector3(p[0], h, -p[1]);
+const S = Object.fromEntries(D.scenes.map((s) => [s.n, s]));
+const ease = (x) => x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const fade = (t, tin, tout, f = 0.6) => clamp(Math.min((t - tin) / f, (tout - t) / f));
+const mmss = (s) => `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(1);
+renderer.setSize(1920, 1080);
+document.body.prepend(renderer.domElement);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0b1220);
+scene.fog = new THREE.Fog(0x0b1220, 45, 110);
+const camera = new THREE.PerspectiveCamera(38, 1920 / 1080, 0.05, 300);
+scene.add(new THREE.HemisphereLight(0xbcd3ff, 0x0b1220, 1.0));
+const sun = new THREE.DirectionalLight(0xffffff, 1.2);
+sun.position.set(-10, 20, 8);
+scene.add(sun);
+
+// ---------- static world ----------
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(400, 400), new THREE.MeshLambertMaterial({ color: 0x0f1828 }));
+ground.rotation.x = -Math.PI / 2;
+ground.position.y = -0.02;
+scene.add(ground);
+const CTY = { "桃園市": 0x1b2c4a, "新北市": 0x1d3a3a, "臺北市": 0x34304f, "基隆市": 0x1a2436 };
+const ctyMats = {};
+for (const c of D.counties) {
+  const shape = new THREE.Shape(c.ring.map((p) => new THREE.Vector2(p[0], p[1])));
+  const mat = ctyMats[c.name] ||= new THREE.MeshLambertMaterial({ color: CTY[c.name], transparent: true });
+  const m = new THREE.Mesh(new THREE.ShapeGeometry(shape), mat);
+  m.rotation.x = -Math.PI / 2;
+  scene.add(m);
+  scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(c.ring.map((p) => V(p, 0.004))),
+    new THREE.LineBasicMaterial({ color: 0x9cbcff, transparent: true, opacity: 0.5 })));
+}
+
+function ribbon(pts, w, mat) {
+  const pos = [], idx = [];
+  for (let i = 0; i < pts.length; i++) {
+    const a = pts[Math.max(0, i - 1)], b = pts[Math.min(pts.length - 1, i + 1)];
+    const d = new THREE.Vector3().subVectors(b, a).setY(0).normalize();
+    const n = new THREE.Vector3(-d.z, 0, d.x).multiplyScalar(w / 2);
+    pos.push(pts[i].x + n.x, pts[i].y, pts[i].z + n.z, pts[i].x - n.x, pts[i].y, pts[i].z - n.z);
+    if (i) idx.push(2 * i - 2, 2 * i - 1, 2 * i, 2 * i - 1, 2 * i + 1, 2 * i);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+  g.setIndex(idx);
+  g.computeVertexNormals();
+  return new THREE.Mesh(g, mat);
+}
+const matRoad = new THREE.MeshBasicMaterial({ color: 0x2f8f88, side: THREE.DoubleSide });
+const matVia = new THREE.MeshLambertMaterial({ color: 0xffb547, emissive: 0x6b3d00, side: THREE.DoubleSide, transparent: true });
+const matPier = new THREE.MeshLambertMaterial({ color: 0x8a7a66 });
+// level of detail: thin true-scale ribbons up close, wide ones in the far shots so lines stay visible
+const LOD = [];
+function lod(pts, thin, thick, mat) {
+  const a = ribbon(pts, thin, mat), b = ribbon(pts, thick, mat);
+  scene.add(a, b);
+  LOD.push({ a, b });
+}
+const piers = new THREE.Group();
+scene.add(piers);
+const pierGeo = new THREE.BoxGeometry(0.03, H, 0.03);
+for (const r of D.roads) {
+  if (r.viaduct) {
+    lod(r.pts.map((p) => V(p, H)), 0.11, 0.32, matVia);
+    for (let i = 0; i < r.pts.length; i += 3) {
+      const pier = new THREE.Mesh(pierGeo, matPier);
+      pier.position.copy(V(r.pts[i], H / 2));
+      piers.add(pier);
+    }
+  } else {
+    lod(r.pts.map((p) => V(p, 0.006)), r.ref === "1" ? 0.09 : 0.065, r.ref === "1" ? 0.2 : 0.15, matRoad);
+  }
+}
+const stGeo = new THREE.CylinderGeometry(0.07, 0.07, 0.14, 12);
+const stMat = new THREE.MeshLambertMaterial({ color: 0x9a6a45 });
+for (const s of D.stations) {
+  const m = new THREE.Mesh(stGeo, stMat);
+  m.position.copy(V(s.p, 0.07));
+  scene.add(m);
+}
+
+// ---------- labels with time windows ----------
+const LAB = document.getElementById("labels");
+const labels = [];
+function label(text, pos, cls, tin, tout) {
+  const el = document.createElement("div");
+  el.className = "lab " + cls;
+  el.innerHTML = text;
+  LAB.appendChild(el);
+  labels.push({ el, pos, tin, tout });
+}
+const P = D.places;
+const T0 = (n, dt = 0) => S[n].t0 + dt, AU = (n, dt = 0) => S[n].audio_at + dt, T1 = (n, dt = 0) => S[n].t1 + dt;
+for (const c of ["臺北市", "新北市", "桃園市"]) label(c.split("").join(" "), V(P[c]), "cty", T0(2, 14), T1(5));
+label("汐止", V(P["汐止"], 0.5), "place", AU(2, 2), T1(3));
+label("五股", V(P["五股"], 0.6), "place", AU(2, 2), T1(7));
+label("楊梅", V(P["楊梅"], 0.5), "place", AU(2, 6), T1(3));
+
+// scene 1: the two levels at 五股
+const tgt = V(D.target, H);
+label("高架道路（五楊）", tgt.clone().add(new THREE.Vector3(-0.9, 0.35, 0.25)), "level via", AU(1, 13), T1(1));
+label("平面道路（中山高）", tgt.clone().add(new THREE.Vector3(-0.6, -0.25, 0.9)), "level gnd", AU(1, 13), T1(1));
+// scene 2: lengths
+label("汐五高架　約 18 公里", V([17, 9.5], 1.2), "ic big", AU(2, 4), T1(2));
+label("五楊高架　約 40 公里", V([-8, 4], 1.2), "ic big", AU(2, 7), T1(2));
+label("合計約 58 公里", V([3, 13], 2.0), "acc big", AU(2, 12), T1(2));
+// scene 3: northbound entrances and the gap
+const ents = D.entrances.filter((e, i, a) => a.findIndex((x) => x.name === e.name) === i);
+ents.forEach((e, i) => label(`入口：${e.name}`, V(e.p, H + 0.6), "in", AU(3, 7 + i * 1.6), T1(3)));
+label("約 20 公里　沒有入口", V([-1, 7.5], H + 1.2), "warn", AU(3, 14), T1(3));
+// scene 4: incident
+for (const [a, b] of [[AU(1, 1), T1(1)], [T0(4), T1(4)], [T0(6), T1(6)]])
+  label("事故點　北上 30.5K（新北市）", tgt.clone().add(new THREE.Vector3(0, 0.45, 0)), "acc big", a, b);
+// scene 5: callouts
+label("興國分隊最快：中壢 → 五股　約 28 公里", V([-6, 4.5], H + 1.8), "st big", AU(5, 9), AU(5, 21));
+label("其中約 9 公里在新北市", V([4, 8.8], H + 1.0), "warn", AU(5, 14), AU(5, 21));
+label("新北市境內，最快的是<br>臺北市社子分隊", V([7, 7.5], H + 1.6), "st big", AU(5, 22), T1(5));
+label("新北市德音分隊<br>一路負責到桃園", V([-7, 3], H + 1.6), "st big", AU(5, 27), T1(5));
+
+// ---------- dynamic: incident marker ----------
+const acc = new THREE.Mesh(new THREE.RingGeometry(0.16, 0.24, 48), new THREE.MeshBasicMaterial({ color: 0xff3b3b, side: THREE.DoubleSide, transparent: true }));
+acc.rotation.x = -Math.PI / 2;
+acc.position.copy(tgt).setY(H + 0.02);
+scene.add(acc);
+
+// ---------- dynamic: northbound gap highlight (scene 3) ----------
+const north = D.strips.filter((s) => s.dir === "北上");
+const gapPts = [];
+for (const s of north) s.pts.forEach((p, i) => { if (s.km[i] <= 50.8 && s.km[i] >= 30.4 && s.county !== undefined) gapPts.push({ p, km: s.km[i] }); });
+gapPts.sort((a, b) => b.km - a.km);
+const gapMat = new THREE.MeshBasicMaterial({ color: 0xff3b3b, transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false });
+const gapMesh = ribbon(gapPts.map((g) => V(g.p, H + 0.06)), 0.6, gapMat);
+gapMesh.renderOrder = 10;                         // draw over the (also transparent) viaduct
+scene.add(gapMesh);
+const entMat = new THREE.MeshBasicMaterial({ color: 0x3ddc97, transparent: true, opacity: 0, depthWrite: false });
+const entMarks = ents.map((e) => { const m = new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.45, 20), entMat); m.rotation.x = Math.PI; m.position.copy(V(e.p, H + 0.35)); scene.add(m); return m; });
+
+// ---------- dynamic: fastest-station colour strips (scene 5) ----------
+const PAL = [0x2a78d6, 0xeb6834, 0x1baf7a, 0xeda100, 0xe87ba4, 0x16c2c2, 0x9d8cff, 0xe34948, 0x8bc34a, 0xffffff];
+const stripGroups = { "北上": new THREE.Group(), "南下": new THREE.Group() };
+const stripMats = [];
+for (const s of D.strips) {
+  let a = 0;
+  for (let i = 1; i <= s.best.length; i++) {
+    if (i === s.best.length || s.best[i] !== s.best[a]) {
+      const mat = new THREE.MeshBasicMaterial({ color: PAL[s.best[a] % PAL.length], transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false });
+      stripMats.push({ mat, dir: s.dir });
+      const m = ribbon(s.pts.slice(a, Math.min(i + 1, s.pts.length)).map((p) => V(p, H + 0.06)), 0.6, mat);
+      m.renderOrder = 10;
+      stripGroups[s.dir].add(m);
+      a = i;
+    }
+  }
+}
+scene.add(stripGroups["北上"], stripGroups["南下"]);
+const legend = document.getElementById("legend");
+function legendFor(dir) {
+  const used = [...new Set(D.strips.filter((s) => s.dir === dir).flatMap((s) => s.best))];
+  legend.innerHTML = `<div class="h">${dir}：每一段最快到場的分隊</div>` +
+    used.map((i) => `<div class="r"><span class="sw" style="background:#${PAL[i % PAL.length].toString(16).padStart(6, "0")}"></span>${D.strip_names[i]}</div>`).join("");
+}
+
+// ---------- dynamic: ambulances ----------
+const COL = { "興國分隊": 0x36c2ff, "青埔分隊": 0xb38bff, "隆恩分隊": 0xff5d5d, "大園分隊": 0x3ddc97, "文化分隊": 0xffd166 };
+const hex = (c) => "#" + c.toString(16).padStart(6, "0");
+function makeRoute(name) {
+  const R = D.routes[name];
+  const pts = R.pts.map((p) => V(p));
+  const pc = [0];
+  for (let i = 1; i < pts.length; i++) pc.push(pc[i - 1] + pts[i].distanceTo(pts[i - 1]));
+  let next = Infinity;
+  for (let i = pts.length - 1; i >= 0; i--) {
+    if (R.viaduct[i]) { next = pc[i]; pts[i].y = H; continue; }
+    pts[i].y = Math.max(0, 1 - (next - pc[i]) / 0.9) * H;
+  }
+  const g = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.1, 0.09), new THREE.MeshLambertMaterial({ color: 0xffffff, emissive: 0x444444 }));
+  const top = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.04, 0.08), new THREE.MeshBasicMaterial({ color: COL[name] }));
+  top.position.y = 0.07;
+  g.add(body, top);
+  g.visible = false;
+  scene.add(g);
+  const mat = new THREE.MeshBasicMaterial({ color: COL[name], side: THREE.DoubleSide, transparent: true, opacity: 0.9 });
+  return { name, pts, sec: R.sec, end: R.sec[R.sec.length - 1], g, top, mat, trail: null };
+}
+const RT = Object.fromEntries(Object.keys(D.routes).map((n) => [n, makeRoute(n)]));
+function placeRoute(r, s, scale, opacity) {
+  // s = model seconds since dispatch (null hides the route)
+  if (r.trail) { scene.remove(r.trail); r.trail.geometry.dispose(); r.trail = null; }
+  r.g.visible = s !== null && opacity > 0;
+  if (!r.g.visible) return;
+  s = Math.min(s, r.end);
+  let i = r.sec.findIndex((c) => c >= s);
+  if (i < 1) i = 1;
+  const f = clamp((s - r.sec[i - 1]) / (r.sec[i] - r.sec[i - 1] || 1));
+  const p = r.pts[i - 1].clone().lerp(r.pts[i], f);
+  const d = r.pts[i].clone().sub(r.pts[i - 1]);
+  r.g.position.copy(p).setY(p.y + 0.05);
+  r.g.rotation.y = Math.atan2(-d.z, d.x);
+  r.g.scale.setScalar(scale);
+  r.mat.opacity = 0.9 * opacity;
+  const tp = [...r.pts.slice(0, i), p].map((q) => q.clone().setY(q.y + 0.015));
+  if (tp.length > 1) { r.trail = ribbon(tp, 0.07 * Math.max(1, scale * 0.8), r.mat); scene.add(r.trail); }
+}
+
+// race panel (scene 4) and bar chart (scene 6)
+const RACE = ["興國分隊", "青埔分隊", "隆恩分隊"];
+const raceEl = document.getElementById("race");
+raceEl.innerHTML = `<div class="h">出發後經過時間（模型估算，不塞車）</div>` + RACE.map((n) =>
+  `<div class="row" id="r-${n}"><span class="dot" style="background:${hex(COL[n])}"></span><span>${n}<small>${n === "隆恩分隊" ? "新北市" : "桃園市"}</small></span><span class="t">00:00</span></div>`).join("");
+document.getElementById("rank").innerHTML = `隆恩分隊在附近 154 個分隊中<br>排第 <b>30</b> 名<br><span style="font-size:26px;color:#c9d5e3">新北市最快的林口文化分隊：約 30.1 分鐘</span>`;
+const BARS = [["興國分隊", 19.7, "最快"], ["大園分隊", 21.0, ""], ["青埔分隊", 21.9, "第一優先"], ["文化分隊", 30.1, "新北市最快"], ["隆恩分隊", 31.6, "新北市優先"]];
+const barsEl = document.getElementById("bars");
+barsEl.innerHTML = `<div class="h">到北上 30.5K（五股前）需要幾分鐘？</div>` + BARS.map(([n, v, tag]) =>
+  `<div class="r"><span>${n}${tag ? `<span class="tag" style="background:${tag === "第一優先" ? "#3ddc97" : "rgba(255,255,255,.14)"};color:${tag === "第一優先" ? "#0b1220" : "#eef3f8"}">${tag}</span>` : ""}</span>` +
+  `<span><span class="bar" data-v="${v}" style="display:block;background:${hex(COL[n])}"></span></span><span class="v">${v.toFixed(1)} 分</span></div>`).join("") +
+  `<div class="note">模型估算：依速限、不塞車、不含出勤準備時間</div>`;
+
+// ---------- camera keyframes: [time, target x, target y(north), dist, height, bearing°] ----------
+const K = [
+  [0, 0, 2, 44, 46, 190],
+  [T0(1, 1), 0, 2, 44, 46, 190],
+  [AU(1, 10), 8, 7.5, 10, 9, 200],
+  [AU(1, 17), 8.1, 8.2, 3.2, 1.5, 165],
+  [T1(1), 8.1, 8.2, 3.2, 1.5, 165],
+  [AU(2, 2), 22, 8, 12, 10, 185],
+  [AU(2, 14), 8, 8, 16, 14, 182],
+  [AU(2, 27), -12, -2, 22, 20, 175],
+  [T1(2), 0, 1, 36, 36, 180],
+  [AU(3, 5), -12, -3, 30, 30, 195],
+  [AU(3, 13), -10, -1, 31, 31, 192],
+  [AU(3, 24), -2, 4, 24, 22, 188],
+  [T1(3), -1, 3, 28, 26, 188],
+  [AU(4, 3), 7.5, 7.8, 9, 8, 200],
+  [AU(4, 11), -4, 1, 32, 32, 190],
+  [T1(4), -4, 1, 32, 32, 190],
+  [AU(5, 1), 0, 1, 34, 34, 185],
+  [AU(5, 16), 2, 3, 30, 30, 185],
+  [T1(5), 2, 3, 32, 32, 185],
+  [T1(6), -2, 1, 30, 30, 188],
+  [AU(7, 10), 0, 1, 40, 42, 190],
+  [D.total, 0, 1, 48, 50, 190],
+];
+function cameraAt(t) {
+  let i = K.findIndex((k) => k[0] > t);
+  if (i === -1) i = K.length - 1;
+  if (i === 0) i = 1;
+  const a = K[i - 1], b = K[i];
+  const f = ease(clamp((t - a[0]) / Math.max(0.001, b[0] - a[0])));
+  const L = (j) => a[j] + (b[j] - a[j]) * f;
+  const az = THREE.MathUtils.degToRad(L(5));
+  const tx = L(1), tz = -L(2), dist = L(3), hgt = L(4);
+  camera.position.set(tx + Math.sin(az) * dist, hgt, tz - Math.cos(az) * dist);
+  camera.lookAt(tx, Math.min(H, hgt * 0.05), tz);
+  return dist;
+}
+
+// ---------- the frame function ----------
+const RACE_T0 = AU(4, 15), RACE_LEN = 40;         // race: model 0 → 31.6 min over 40 s of screen time
+const RACE_K = 31.62 * 60 / RACE_LEN;
+const el = (id) => document.getElementById(id);
+window.frame = (t) => {
+  const dist = cameraAt(t);
+  for (const o of LOD) { o.a.visible = dist <= 12; o.b.visible = dist > 12; }
+  piers.visible = dist < 16;
+  const zoomScale = Math.max(1, dist / 4);
+
+  // incident ring
+  const accOn = Math.max(fade(t, AU(1, 1), T1(1)), fade(t, T0(4), T1(4)), fade(t, T0(6), T1(6)));
+  acc.visible = accOn > 0;
+  acc.scale.setScalar(1 + 0.3 * Math.sin(t * 5) + (zoomScale - 1) * 0.5);
+  acc.material.opacity = accOn * (0.65 + 0.35 * Math.sin(t * 5));
+
+  // scene 3
+  gapMat.opacity = 0.75 * fade(t, AU(3, 14), T1(3)) * (0.75 + 0.25 * Math.sin(t * 4));
+  entMat.opacity = fade(t, AU(3, 7), T1(3));
+  entMarks.forEach((m) => { m.visible = entMat.opacity > 0; m.scale.setScalar(Math.max(1, dist / 8)); });
+  gapMesh.visible = gapMat.opacity > 0;
+
+  // scene 4 race; scene 6 replays 青埔 and 大園
+  const raceS = t < RACE_T0 ? 0 : (t - RACE_T0) * RACE_K;
+  const raceOn = fade(t, AU(4, 0), T1(4), 0.8);
+  for (const n of Object.keys(RT)) {
+    let s = null, op = 0;
+    if (RACE.includes(n) && raceOn > 0) { s = raceS; op = raceOn; }
+    if (["青埔分隊", "大園分隊"].includes(n) && fade(t, AU(6, 2), T1(6)) > 0) { s = (t - AU(6, 2)) * 60; op = fade(t, AU(6, 2), T1(6)); }
+    placeRoute(RT[n], s, zoomScale * 0.9, op);
+  }
+  el("race").style.opacity = fade(t, AU(4, 12), T1(4));
+  for (const n of RACE) {
+    const r = el("r-" + n);
+    const s = Math.min(raceS, RT[n].end);
+    r.querySelector(".t").textContent = mmss(s);
+    r.classList.toggle("done", raceS >= RT[n].end);
+  }
+  el("rank").style.opacity = fade(t, AU(4, 47), T1(4));
+
+  // scene 5 strips: northbound first, then southbound
+  const nOn = fade(t, AU(5, 3), AU(5, 21)), sOn = fade(t, AU(5, 21), T1(5));
+  for (const m of stripMats) m.mat.opacity = 0.95 * (m.dir === "北上" ? nOn : sOn);
+  matVia.opacity = 1 - 0.55 * Math.max(nOn, sOn);
+  if (nOn > 0) legendFor("北上"); else if (sOn > 0) legendFor("南下");
+  el("legend").style.opacity = Math.max(nOn, sOn);
+
+  // scene 6 bar chart
+  const bOn = fade(t, AU(6, 5), T1(6));
+  el("bars").style.opacity = bOn;
+  barsEl.querySelectorAll(".bar").forEach((b, i) => {
+    const g = ease(clamp((t - AU(6, 5.5) - i * 0.5) / 1.2));
+    b.style.width = (b.dataset.v / 32 * 100 * g) + "%";
+  });
+
+  // title and closing cards
+  el("title").style.opacity = fade(t, -1, T0(1, 0.5), 0.8);
+  el("end").style.opacity = fade(t, T1(7), D.total + 1, 0.8);
+
+  // subtitles
+  let sub = "";
+  for (const sc of D.scenes) for (const [a, b, s] of sc.subs) if (t >= a && t < b) sub = s;
+  el("sub").textContent = sub;
+
+  renderer.render(scene, camera);
+  for (const l of labels) {
+    const o = fade(t, l.tin, l.tout, 0.5);
+    if (o <= 0) { l.el.style.display = "none"; continue; }
+    const v = l.pos.clone().project(camera);
+    const vis = v.z < 1 && Math.abs(v.x) < 1.05 && Math.abs(v.y) < 1.05;
+    l.el.style.display = vis ? "block" : "none";
+    l.el.style.opacity = o;
+    l.el.style.left = ((v.x + 1) / 2 * 1920) + "px";
+    l.el.style.top = ((1 - v.y) / 2 * 1080) + "px";
+  }
+};
+await document.fonts.ready;
+window.TOTAL = D.total;
+window.frame(0);
+window.ready = true;
+</script>
+</body>
+</html>
