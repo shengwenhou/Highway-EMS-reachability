@@ -159,15 +159,23 @@ def main():
     cty = gpd.read_file(ROOT / "data" / "raw" / "county" / "package" / "counties-10t.json",
                         layer="counties").set_crs(4326)
     cty = cty[cty.COUNTYNAME.isin(["臺北市", "新北市", "桃園市", "基隆市"])]
+    # county borders to draw: real boundaries only, not the edge of the clipping window
+    frame = box(*BBOX)
+    borders = []
+    for geom in cty.geometry:
+        line = geom.boundary.intersection(frame).difference(frame.exterior.buffer(1e-4))
+        for ln in (getattr(line, "geoms", None) or [line]):
+            if ln.geom_type == "LineString" and ln.length > 0.002:
+                borders.append([xy(a, b) for a, b in ln.simplify(0.0005).coords])
     counties = []
-    for name, geom in zip(cty.COUNTYNAME, cty.geometry.intersection(box(*BBOX))):
+    for name, geom in zip(cty.COUNTYNAME, cty.geometry.intersection(frame)):
         for poly in ([geom] if geom.geom_type == "Polygon" else list(geom.geoms)):
             if poly.area > 1e-5:
                 counties.append({"name": name, "ring": [xy(a, b) for a, b in poly.simplify(0.0005).exterior.coords]})
     names, strip = strips()
     rts, target = routes()
     scenes, total = timeline()
-    data = {"roads": roads(p), "counties": counties, "stations": stations, "strips": strip, "strip_names": names,
+    data = {"roads": roads(p), "counties": counties, "borders": borders, "stations": stations, "strips": strip, "strip_names": names,
             "entrances": entrances(), "routes": rts, "target": target, "scenes": scenes, "total": total,
             "places": {"汐止": xy(121.6330, 25.0677), "五股": xy(121.4610, 25.0750), "楊梅": xy(121.1450, 24.9070),
                        "機場系統": xy(121.2825, 25.0262), "中壢": xy(121.2200, 24.9600), "三峽": xy(121.3700, 24.9300),
