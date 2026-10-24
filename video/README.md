@@ -2,6 +2,8 @@
 
 約 4 分 46 秒的 3D 資訊圖動畫，給一般民眾看：為什麼五楊高架上的事故，依「事故在哪個縣市」派車，往往不是最快到場的分隊。旁白稿在 [`narration.md`](narration.md)。
 
+**觀看**：[YouTube「汐五、五楊高架救護反應困境」](https://youtu.be/lhAl9ud9Hpc)，也嵌在五楊頁 `output/wuyang.html` 的開頭（首頁連結列有「▶ 動畫」連到這裡）。
+
 成品影片（1080p，分享版約 82 MB、高畫質版約 300 MB）太大，沒有放進 repo（`.gitignore` 已排除 `video/wuyang_ems*.mp4`），依下面的步驟可以完整重現。
 
 ## 內容
