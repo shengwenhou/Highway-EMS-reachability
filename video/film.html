@@ -348,7 +348,7 @@ const RACE = ["興國分隊", "青埔分隊", "隆恩分隊"];
 const raceEl = document.getElementById("race");
 raceEl.innerHTML = `<div class="h">出發後經過時間（模型估算，不塞車）</div>` + RACE.map((n) =>
   `<div class="row" id="r-${n}"><span class="dot" style="background:${hex(COL[n])}"></span><span>${n}<small>${n === "隆恩分隊" ? "新北市" : "桃園市"}</small></span><span class="t">00:00</span></div>`).join("");
-document.getElementById("rank").innerHTML = `隆恩分隊在附近 154 個分隊中<br>排第 <b>30</b> 名<br><span style="font-size:26px;color:#c9d5e3">新北市最快的林口文化分隊：約 30.1 分鐘</span>`;
+document.getElementById("rank").innerHTML = `比隆恩分隊先到的分隊：<b>29</b> 個<br>其中 27 個在桃園市<br><span style="font-size:26px;color:#c9d5e3">新北市最快的林口文化分隊：約 30.1 分鐘</span>`;
 const BARS = [["興國分隊", 19.7, "最快"], ["大園分隊", 21.0, ""], ["青埔分隊", 21.9, "第一優先"], ["文化分隊", 30.1, "新北市最快"], ["隆恩分隊", 31.6, "新北市優先"]];
 const barsEl = document.getElementById("bars");
 barsEl.innerHTML = `<div class="h">到北上 30.5K（五股前）需要幾分鐘？</div>` + BARS.map(([n, v, tag]) =>

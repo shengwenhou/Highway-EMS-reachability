@@ -15,9 +15,9 @@
   "audio_tokens": 852
  },
  "scene4": {
-  "chars": 276,
-  "prompt_tokens": 244,
-  "audio_tokens": 1444
+  "chars": 287,
+  "prompt_tokens": 250,
+  "audio_tokens": 1487
  },
  "scene5": {
   "chars": 162,
