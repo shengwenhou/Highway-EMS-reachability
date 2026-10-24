@@ -14,6 +14,7 @@
   --bg: #f5f6f2; --surface: #ffffff; --land: #e7eae3; --land-edge: #9aa198;
   --fg: #1e2420; --muted: #5d665f; --rule: #d6dbd3; --accent: #0f5c4a;
   --c0: #1f9e5a; --c1: #d9b310; --c2: #ec7a1c; --c3: #d33a2c; --c4: #7d3c98;
+  --q-hot: #d33a2c; --q-busy: #ec7a1c; --q-slow: #2a78d6; --q-ok: #c3c8c0;
   --font-display: "Noto Serif TC", "Songti TC", serif;
   --font-body: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
   --font-data: "IBM Plex Mono", ui-monospace, "SFMono-Regular", monospace;
@@ -23,12 +24,14 @@
     --bg: #131714; --surface: #1b201c; --land: #252b26; --land-edge: #59625b;
     --fg: #e8ece6; --muted: #9ba59d; --rule: #323a34; --accent: #5cc4a4; color-scheme: dark;
     --c0: #34b874; --c1: #e8c42e; --c2: #f28c38; --c3: #ec5a4a; --c4: #b072d0;
+    --q-hot: #ec5a4a; --q-busy: #f28c38; --q-slow: #5b9ff0; --q-ok: #4a524c;
   }
 }
 :root[data-theme="dark"] {
   --bg: #131714; --surface: #1b201c; --land: #252b26; --land-edge: #59625b;
   --fg: #e8ece6; --muted: #9ba59d; --rule: #323a34; --accent: #5cc4a4; color-scheme: dark;
   --c0: #34b874; --c1: #e8c42e; --c2: #f28c38; --c3: #ec5a4a; --c4: #b072d0;
+  --q-hot: #ec5a4a; --q-busy: #f28c38; --q-slow: #5b9ff0; --q-ok: #4a524c;
 }
 * { box-sizing: border-box; }
 html { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
@@ -76,6 +79,22 @@ ol#rank button:hover, ol#rank button:focus-visible { background: var(--bg); outl
 .loc small { font-weight: 400; color: var(--muted); }
 .val { font-family: var(--font-data); white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; }
 .st { grid-column: 2 / 4; font-size: 12px; color: var(--muted); }
+.prio { display: grid; gap: 12px; }
+.prio[hidden] { display: none; }
+.sliders { display: flex; flex-wrap: wrap; gap: 10px 24px; align-items: center; background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 10px 14px; }
+.sliders label { display: block; font-size: 13px; color: var(--muted); min-width: 220px; flex: 1; }
+.sliders b { color: var(--fg); font-family: var(--font-data); }
+.sliders input[type=range] { width: 100%; accent-color: var(--accent); }
+.sliders button { font: inherit; font-size: 13px; border: 1px solid var(--rule); background: var(--bg); color: var(--fg); border-radius: 8px; padding: 6px 10px; cursor: pointer; }
+.scatterbox { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 10px 12px 6px; position: relative; }
+.scatterbox h3 { margin: 0 0 4px; font-size: 15px; }
+.scatterbox svg { display: block; width: 100%; height: auto; }
+.scatterbox .ax text { font-size: 11px; fill: var(--muted); font-family: var(--font-data); }
+.scatterbox .ax line { stroke: var(--rule); }
+.scatterbox .thr { stroke: var(--fg); stroke-dasharray: 4 4; opacity: .55; }
+.scatterbox .ql { font-size: 12px; font-weight: 700; }
+.stip { position: absolute; pointer-events: none; background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; padding: 6px 10px; font-size: 12.5px; box-shadow: 0 2px 8px rgba(0,0,0,.12); display: none; white-space: nowrap; z-index: 10; }
+.qcount { font-family: var(--font-data); color: var(--muted); }
 footer { color: var(--muted); font-size: 13px; max-width: 84ch; display: grid; gap: 6px; border-top: 1px solid var(--rule); padding-top: 16px; }
 footer ul { margin: 0; padding-left: 1.2em; display: grid; gap: 4px; }
 </style>
@@ -97,12 +116,32 @@ footer ul { margin: 0; padding-left: 1.2em; display: grid; gap: 4px; }
   <div class="tiles" id="tiles"></div>
 
   <div class="controls">
+    <div><span class="ctl-label">檢視</span>
+      <span class="seg" role="group" aria-label="檢視">
+        <button type="button" data-view="rate" aria-pressed="true">事故發生率</button>
+        <button type="button" data-view="prio" aria-pressed="false">優先改善</button>
+      </span>
+    </div>
     <div><span class="ctl-label">方向</span>
       <span class="seg" role="group" aria-label="方向">
         <button type="button" data-dir="all" aria-pressed="true">雙向</button>
         <button type="button" data-dir="北上／東行" aria-pressed="false">北上／東行</button>
         <button type="button" data-dir="南下／西行" aria-pressed="false">南下／西行</button>
       </span>
+    </div>
+  </div>
+
+  <div class="prio" id="prio" hidden>
+    <div class="notice" style="border-left-color: var(--q-hot)"><div><b>優先改善＝事故多、救護車又慢的路段。</b>每 5 公里一段，依「事故發生率」與「救護車反應時間（該段中位數）」分成四類。門檻預設約為全國前四分之一，可以拖動調整。反應時間來自本專案的路網模型（不塞車、不含出勤準備時間），發生率未依車流量調整。</div></div>
+    <div class="sliders">
+      <label>事故發生率門檻：<b id="v-rate"></b> 件／公里／年<input type="range" id="s-rate" min="0.5" max="6" step="0.1"></label>
+      <label>反應時間門檻：<b id="v-resp"></b> 分鐘<input type="range" id="s-resp" min="3" max="14" step="0.5"></label>
+      <button type="button" id="s-reset">恢復預設</button>
+    </div>
+    <div class="scatterbox" id="scatter-box">
+      <h3>每一段的事故發生率與救護反應時間</h3>
+      <svg id="scatter" role="img" aria-label="散布圖：橫軸為事故發生率，縱軸為救護反應時間"></svg>
+      <div class="stip" id="stip"></div>
     </div>
   </div>
 
@@ -146,48 +185,118 @@ map.attributionControl.setPrefix(false).addAttribution("© OpenStreetMap contrib
 const county = L.geoJSON(D.counties, { interactive: false, style: () => ({}) }).addTo(map);
 const canvas = L.canvas({ padding: 0.3, tolerance: 6 });
 const layer = L.layerGroup().addTo(map);
-const bins = D.bins.map(([ref, d, main, road, k0, k1, len, n, a1, dead, inj, rate, cty, flat]) => {
+const bins = D.bins.map(([ref, d, main, road, k0, k1, len, n, a1, dead, inj, rate, cty, flat, rmed, rmax, rst]) => {
   const ll = [];
   for (let i = 0; i < flat.length; i += 2) ll.push([flat[i + 1], flat[i]]);
-  return { ref, d, main, road, k0, k1, len, n, a1, dead, inj, rate, cty, ll };
+  return { ref, d, main, road, k0, k1, len, n, a1, dead, inj, rate, cty, ll, rmed, rmax, rst };
 });
+let view = "rate";
+const thr = { rate: D.priority.rate, resp: D.priority.resp };
+const QUAD = {
+  hot: { name: "事故多、救護慢（優先改善）", v: "--q-hot" },
+  busy: { name: "事故多、救護快", v: "--q-busy" },
+  slow: { name: "事故少、救護慢", v: "--q-slow" },
+  ok: { name: "事故少、救護快", v: "--q-ok" },
+};
+const quad = (b) => (b.rate >= thr.rate ? (b.rmed >= thr.resp ? "hot" : "busy") : (b.rmed >= thr.resp ? "slow" : "ok"));
+const shownBins = () => bins.filter((b) => dir === "all" || GROUP[b.d] === dir);
 function popup(b) {
   return `<div class="pop"><h3>國道${b.ref} ${b.d} ${fmt(b.k0)}K–${fmt(b.k1)}K</h3>` +
     (b.main ? "" : `<div class="s">${b.road}</div>`) +
     `<div>發生率 <span class="v">${fmt(b.rate, 2)}</span> 件／公里／年</div>` +
     `<div>${NY} 年共 <span class="v">${b.n}</span> 件（A1 ${b.a1} 件）</div>` +
     `<div>死亡 <span class="v">${b.dead}</span> 人・受傷 <span class="v">${b.inj}</span> 人</div>` +
+    `<div>救護反應 <span class="v">${fmt(b.rmed)}</span> 分（中位數，最久 ${fmt(b.rmax)} 分）</div>` +
+    `<div class="s">多由${b.rst}最快到場</div>` +
+    (view === "prio" ? `<div><b style="color:${css(QUAD[quad(b)].v)}">● ${QUAD[quad(b)].name}</b></div>` : "") +
     `<div class="s">${b.cty}・本段長 ${fmt(b.len)} 公里</div></div>`;
 }
 function draw() {
   layer.clearLayers();
-  bins.filter((b) => dir === "all" || GROUP[b.d] === dir).sort((a, b) => a.rate - b.rate).forEach((b) => {
-    b.line = L.polyline(b.ll, { renderer: canvas, color: css("--c" + cls(b.rate)), weight: 4, lineCap: "butt", opacity: 1 })
+  const prio = view === "prio";
+  document.getElementById("prio").hidden = !prio;   // before scatter(), which measures its box
+  const col = prio ? (b) => css(QUAD[quad(b)].v) : (b) => css("--c" + cls(b.rate));
+  const order = prio ? (b) => ["ok", "slow", "busy", "hot"].indexOf(quad(b)) : (b) => b.rate;
+  shownBins().sort((a, b) => order(a) - order(b)).forEach((b) => {
+    b.line = L.polyline(b.ll, { renderer: canvas, color: col(b), weight: prio && quad(b) === "hot" ? 6 : 4, lineCap: "butt", opacity: 1 })
       .bindPopup(() => popup(b)).addTo(layer);
   });
-  const e = D.breaks;
-  const labels = [`< ${e[0]}`, ...e.slice(0, -1).map((a, i) => `${a}–${e[i + 1]}`), `≥ ${e[e.length - 1]}`];
-  document.getElementById("legend").innerHTML = `<div class="t">每公里每年 A1＋A2 件數</div>` +
-    labels.slice().reverse().map((l, i) => `<div class="row"><span class="sw" style="background:${css("--c" + (4 - i))}"></span>${l}</div>`).join("");
+  if (prio) {
+    const cnt = {};
+    shownBins().forEach((b) => { cnt[quad(b)] = (cnt[quad(b)] || 0) + 1; });
+    document.getElementById("legend").innerHTML = `<div class="t">優先改善（每 5 公里一段）</div>` +
+      ["hot", "busy", "slow", "ok"].map((q) => `<div class="row"><span class="sw" style="background:${css(QUAD[q].v)}"></span>${QUAD[q].name} <span class="qcount">${cnt[q] || 0}</span></div>`).join("");
+    scatter();
+  } else {
+    const e = D.breaks;
+    const labels = [`< ${e[0]}`, ...e.slice(0, -1).map((a, i) => `${a}–${e[i + 1]}`), `≥ ${e[e.length - 1]}`];
+    document.getElementById("legend").innerHTML = `<div class="t">每公里每年 A1＋A2 件數</div>` +
+      labels.slice().reverse().map((l, i) => `<div class="row"><span class="sw" style="background:${css("--c" + (4 - i))}"></span>${l}</div>`).join("");
+  }
   rank();
   document.querySelectorAll("[data-dir]").forEach((b) => b.setAttribute("aria-pressed", b.dataset.dir === dir));
+  document.querySelectorAll("[data-view]").forEach((b) => b.setAttribute("aria-pressed", b.dataset.view === view));
+}
+function focusBin(b) {
+  map.flyToBounds(L.latLngBounds(b.ll).pad(0.6), { duration: 0.6 });
+  setTimeout(() => b.line && b.line.openPopup(), 700);
+}
+function scatter() {
+  const svg = document.getElementById("scatter"), box = document.getElementById("scatter-box");
+  const W = Math.max(300, box.clientWidth - 24), H = Math.round(Math.min(340, Math.max(230, W * 0.42)));
+  const m = { l: 42, r: 12, t: 22, b: 34 };
+  const xs = shownBins(), lx = (v) => Math.log(Math.max(v, 0.05));
+  const x0 = lx(0.05), x1 = lx(16), yMax = Math.ceil(Math.max(...bins.map((b) => b.rmed)) / 2) * 2;
+  const X = (v) => m.l + (lx(v) - x0) / (x1 - x0) * (W - m.l - m.r);
+  const Y = (v) => H - m.b - v / yMax * (H - m.t - m.b);
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  let g = `<g class="ax">`;
+  [0.1, 0.25, 0.5, 1, 2, 4, 8, 16].forEach((t) => { g += `<line x1="${X(t)}" x2="${X(t)}" y1="${m.t}" y2="${H - m.b}"/><text x="${X(t)}" y="${H - m.b + 14}" text-anchor="middle">${t}</text>`; });
+  for (let v = 0; v <= yMax; v += 2) g += `<line x1="${m.l}" x2="${W - m.r}" y1="${Y(v)}" y2="${Y(v)}"/><text x="${m.l - 6}" y="${Y(v) + 4}" text-anchor="end">${v}</text>`;
+  g += `<text x="${(m.l + W - m.r) / 2}" y="${H - 4}" text-anchor="middle">事故發生率（件／公里／年，對數刻度）</text>`;
+  g += `<text x="${m.l}" y="${m.t - 10}" text-anchor="start">反應時間（分）</text></g>`;
+  g += `<line class="thr" x1="${X(thr.rate)}" x2="${X(thr.rate)}" y1="${m.t}" y2="${H - m.b}"/><line class="thr" x1="${m.l}" x2="${W - m.r}" y1="${Y(thr.resp)}" y2="${Y(thr.resp)}"/>`;
+  g += `<text class="ql" x="${W - m.r - 4}" y="${m.t + 14}" text-anchor="end" fill="${css("--q-hot")}">優先改善</text>`;
+  xs.slice().sort((a, b) => ["ok", "slow", "busy", "hot"].indexOf(quad(a)) - ["ok", "slow", "busy", "hot"].indexOf(quad(b))).forEach((b) => {
+    g += `<circle data-i="${bins.indexOf(b)}" cx="${X(b.rate).toFixed(1)}" cy="${Y(b.rmed).toFixed(1)}" r="${quad(b) === "hot" ? 5 : 3.5}" fill="${css(QUAD[quad(b)].v)}" stroke="${css("--surface")}" stroke-width="1.2"/>`;
+  });
+  svg.innerHTML = g;
+  const tip = document.getElementById("stip");
+  svg.querySelectorAll("circle").forEach((c) => {
+    const b = bins[+c.dataset.i];
+    c.style.cursor = "pointer";
+    c.addEventListener("pointerenter", () => {
+      tip.innerHTML = `<b>國道${b.ref} ${b.d} ${fmt(b.k0, 0)}–${fmt(b.k1, 0)}K</b> ${b.cty}<br>發生率 ${fmt(b.rate, 2)}・反應 ${fmt(b.rmed)} 分`;
+      const r = svg.getBoundingClientRect(), bx = box.getBoundingClientRect();
+      const px = (+c.getAttribute("cx")) / W * r.width + r.left - bx.left, py = (+c.getAttribute("cy")) / H * r.height + r.top - bx.top;
+      tip.style.display = "block";
+      tip.style.left = Math.min(Math.max(8, px + 10), bx.width - tip.offsetWidth - 8) + "px";
+      tip.style.top = Math.max(4, py - tip.offsetHeight - 8) + "px";
+    });
+    c.addEventListener("pointerleave", () => { tip.style.display = "none"; });
+    c.addEventListener("click", () => { document.getElementById("map").scrollIntoView({ behavior: "smooth", block: "center" }); focusBin(b); });
+  });
 }
 function rank() {
-  const list = bins.filter((b) => dir === "all" || GROUP[b.d] === dir).sort((a, b) => b.rate - a.rate).slice(0, 15);
-  document.getElementById("rank-note").textContent =
-    `全部 ${bins.length} 段的中位數是每公里每年 ${fmt(S.median_rate, 2)} 件。點一下可在地圖上定位。`;
+  const prio = view === "prio";
+  const list = prio
+    ? shownBins().filter((b) => quad(b) === "hot").sort((a, b) => b.rate * b.rmed - a.rate * a.rmed)
+    : shownBins().sort((a, b) => b.rate - a.rate).slice(0, 15);
+  document.getElementById("rank-title").textContent = prio ? `優先改善的路段（${list.length} 段）` : "發生率最高的路段";
+  document.getElementById("rank-note").textContent = prio
+    ? `事故發生率 ≥ ${fmt(thr.rate)} 件／公里／年，且救護反應時間中位數 ≥ ${fmt(thr.resp)} 分鐘；依兩者乘積排序。點一下可在地圖上定位。`
+    : `全部 ${bins.length} 段的中位數是每公里每年 ${fmt(S.median_rate, 2)} 件。點一下可在地圖上定位。`;
   const ol = document.getElementById("rank");
   ol.innerHTML = "";
+  if (prio && !list.length) ol.innerHTML = `<li class="note">目前門檻下沒有同時符合兩個條件的路段。</li>`;
   list.forEach((b, i) => {
     const li = document.createElement("li");
+    const swc = prio ? css(QUAD.hot.v) : css("--c" + cls(b.rate));
     li.innerHTML = `<button type="button"><span class="rk">${i + 1}</span>` +
       `<span class="loc">國道${b.ref} ${b.d} ${fmt(b.k0, 0)}–${fmt(b.k1, 0)}K <small>${b.main ? "" : b.road.replace("道路", "") + "・"}${b.cty}</small></span>` +
-      `<span class="val"><span class="sw" style="background:${css("--c" + cls(b.rate))}"></span>${fmt(b.rate, 1)}</span>` +
-      `<span class="st">${NY} 年 ${b.n} 件・死亡 ${b.dead}・受傷 ${b.inj}</span></button>`;
-    li.querySelector("button").addEventListener("click", () => {
-      map.flyToBounds(L.latLngBounds(b.ll).pad(0.6), { duration: 0.6 });
-      setTimeout(() => b.line && b.line.openPopup(), 700);
-    });
+      `<span class="val"><span class="sw" style="background:${swc}"></span>${prio ? `${fmt(b.rate, 1)} 件・${fmt(b.rmed)} 分` : fmt(b.rate, 1)}</span>` +
+      `<span class="st">${prio ? `${NY} 年 ${b.n} 件・最快到場：${b.rst}（最久 ${fmt(b.rmax)} 分）` : `${NY} 年 ${b.n} 件・死亡 ${b.dead}・受傷 ${b.inj}`}</span></button>`;
+    li.querySelector("button").addEventListener("click", () => focusBin(b));
     ol.appendChild(li);
   });
 }
@@ -198,9 +307,23 @@ document.getElementById("method").innerHTML = [
   `分段：每條車道依官方里程每 ${D.bin_km} 公里一段（頭尾不足 2.5 公里的併入相鄰段）。1 公里一段時，三年內有六成五的路段少於 5 件，數字起伏太大；10 公里一段則會把交流道附近的熱點抹平。`,
   `發生率 = 該段事故件數 ÷ 該段長度 ÷ ${NY} 年。交流道匝道上的事故（約占 ${fmt(S.ramp_share * 100, 0)}%）依記載的主線里程計入。本專案的里程是用交流道位置內插，與現場公里牌可能差數百公尺，個別事故可能落到相鄰的一段。`,
   `限制：未依車流量標準化；不含 A3 財損事故；高架與平面路段若原始記載沒有寫「高架」，會計入平面主線。`,
+  `優先改善：每段的救護反應時間取該段每 100 m 點位的中位數（本專案路網模型，最快分隊、不塞車、不含出勤準備）。預設門檻：發生率 ≥ ${D.priority.rate} 件／公里／年、反應時間 ≥ ${D.priority.resp} 分鐘，各約為全國前四分之一。`,
 ].map((t) => `<li>${t}</li>`).join("");
 
 document.querySelectorAll("[data-dir]").forEach((b) => b.addEventListener("click", () => { dir = b.dataset.dir; draw(); }));
+document.querySelectorAll("[data-view]").forEach((b) => b.addEventListener("click", () => { view = b.dataset.view; draw(); }));
+const sRate = document.getElementById("s-rate"), sResp = document.getElementById("s-resp");
+function syncSliders() {
+  sRate.value = thr.rate; sResp.value = thr.resp;
+  document.getElementById("v-rate").textContent = fmt(thr.rate);
+  document.getElementById("v-resp").textContent = fmt(thr.resp);
+}
+sRate.addEventListener("input", () => { thr.rate = +sRate.value; syncSliders(); draw(); });
+sResp.addEventListener("input", () => { thr.resp = +sResp.value; syncSliders(); draw(); });
+document.getElementById("s-reset").addEventListener("click", () => { thr.rate = D.priority.rate; thr.resp = D.priority.resp; syncSliders(); draw(); });
+syncSliders();
+addEventListener("resize", () => { if (view === "prio") { clearTimeout(window._sc); window._sc = setTimeout(scatter, 150); } });
+if (location.hash === "#priority") view = "prio";
 function theme() { county.setStyle({ color: css("--land-edge"), weight: 0.8, fillColor: css("--land"), fillOpacity: 1 }); draw(); }
 theme();
 matchMedia("(prefers-color-scheme: dark)").addEventListener("change", theme);
