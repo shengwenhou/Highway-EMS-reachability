@@ -1,0 +1,37 @@
+{
+ "scene1": {
+  "chars": 106,
+  "prompt_tokens": 105,
+  "audio_tokens": 575
+ },
+ "scene2": {
+  "chars": 146,
+  "prompt_tokens": 141,
+  "audio_tokens": 886
+ },
+ "scene3": {
+  "chars": 159,
+  "prompt_tokens": 146,
+  "audio_tokens": 852
+ },
+ "scene4": {
+  "chars": 276,
+  "prompt_tokens": 244,
+  "audio_tokens": 1444
+ },
+ "scene5": {
+  "chars": 162,
+  "prompt_tokens": 153,
+  "audio_tokens": 862
+ },
+ "scene6": {
+  "chars": 150,
+  "prompt_tokens": 146,
+  "audio_tokens": 814
+ },
+ "scene7": {
+  "chars": 162,
+  "prompt_tokens": 138,
+  "audio_tokens": 897
+ }
+}
