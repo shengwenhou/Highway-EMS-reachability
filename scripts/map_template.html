@@ -52,6 +52,13 @@ h1 { font-family: var(--font-display); font-weight: 900; font-size: clamp(26px, 
 .trivia-link { justify-self: start; font-size: 14px; font-weight: 700; color: var(--accent); text-decoration: none; border: 1px solid var(--accent); border-radius: 99px; padding: 4px 14px; }
 .trivia-link:hover { background: var(--accent); color: var(--surface); }
 .trivia-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.repo { justify-self: start; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; background: var(--surface); border: 1px solid var(--rule); border-left: 4px solid var(--accent); border-radius: 10px; padding: 10px 14px; max-width: 100%; }
+.repo-btn { display: inline-flex; align-items: center; gap: 8px; background: var(--accent); color: var(--surface); font-weight: 700; font-size: 15px; text-decoration: none; border-radius: 8px; padding: 7px 14px; }
+.repo-btn:hover { filter: brightness(1.1); }
+.repo-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.repo-btn svg { width: 18px; height: 18px; fill: currentColor; flex: none; }
+.repo-text { font-size: 13px; color: var(--muted); min-width: 0; }
+.repo-text code { font-family: var(--font-data); font-size: 12.5px; color: var(--fg); overflow-wrap: anywhere; }
 .stats b { font-family: var(--font-data); font-weight: 500; color: var(--fg); font-size: 18px; margin-right: 4px; font-variant-numeric: tabular-nums; }
 .controls { display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; }
 .seg { display: inline-flex; flex-wrap: wrap; border: 1px solid var(--rule); border-radius: 8px; overflow: hidden; background: var(--surface); }
@@ -164,6 +171,10 @@ ol.rank button:focus-visible { outline: 2px solid var(--accent); }
       <a class="trivia-link" href="wuyang.html">汐五・五楊高架：誰的救護車最快到？ →</a>
       <a class="trivia-link" href="crash.html">國道事故地圖：哪些路段最常出事？ →</a>
       <a class="trivia-link" href="wuyang.html#video">▶ 動畫：五楊高架上的救護車（約 5 分鐘） →</a>
+    </div>
+    <div class="repo">
+      <a class="repo-btn" href="https://github.com/shengwenhou/Highway-EMS-reachability" target="_blank" rel="noopener"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>原始碼在 GitHub，歡迎 Fork</a>
+      <span class="repo-text"><code>github.com/shengwenhou/Highway-EMS-reachability</code>・程式碼採 MIT 授權，資料依各來源授權</span>
     </div>
   </header>
 
