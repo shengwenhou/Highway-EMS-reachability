@@ -5,6 +5,8 @@
 1. **反應**：最近的消防分隊派救護車開過去，要多遠、要多久？
 2. **送醫**：從事故點送到最近的**重度級急救責任醫院**，要多遠、要多久？
 
+歡迎 Fork 或改作：程式碼採 [MIT License](LICENSE)，資料與產出依各來源的授權（見文末「授權」）。所有結果都可以用 `scripts/` 的腳本從公開資料重現。
+
 產出檔案：
 
 - 互動地圖：`output/index.html`，可切換六種模式和行車方向；內建**點位查詢**，可選國道、方向、公里數，或直接在地圖上點選
@@ -431,8 +433,13 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt   # 另需 ap
 
 ## 授權
 
-- **程式碼**（`scripts/`、`.github/` 等）：採 [MIT License](LICENSE)。
+- **程式碼**（`scripts/`、`video/` 的程式、`.github/` 等）：採 [MIT License](LICENSE)，© 2026 侯勝文（Hou, Sheng-Wen）。歡迎 Fork、修改、再散布，只要保留版權與授權聲明。
 - **資料與產出**（`data/`、`output/`）：衍生自第三方資料，使用時須遵守各來源的授權：
   - 道路網、交流道與醫院位置來自 OpenStreetMap，依 [ODbL](https://opendatacommons.org/licenses/odbl/) 授權，使用時須標示「© OpenStreetMap contributors」。
   - 消防分隊點位（消防署）與急救責任醫院名單（衛福部）是政府開放資料，依 [政府資料開放授權條款](https://data.gov.tw/license) 使用。
   - 縣市界來自 npm 套件 [`taiwan-atlas`](https://www.npmjs.com/package/taiwan-atlas)（MIT 授權）。
+  - 交通事故逐案資料（內政部警政署）與路段交通量、交流道里程（交通部高速公路局）是政府開放資料，依 [政府資料開放授權條款](https://data.gov.tw/license) 使用。
+- **影片素材**（`video/`）：
+  - 遠景衛星影像 Sentinel-2 cloudless 2023 by EOX IT Services，依 [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/) 授權，**限非商業用途**；含有這份影像的影片與 `video/data/ground_wide.jpg` 也受此限制。
+  - 近景航照為內政部國土測繪中心正射影像，授權條款尚待確認，使用時請標示出處。
+  - 旁白稿 `video/narration.md` 與以 Gemini TTS 合成的語音 `video/audio/` 隨程式碼採 MIT 授權。
