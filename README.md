@@ -19,6 +19,7 @@
   - 救護風險：`output/map_risk.png`，救護車停在車道上時被後車追撞的風險（紅／黃／綠）
 - 跨區救護路段清單：`output/cross_county_segments.csv`
 - 救護風險紅色路段清單：`output/risk_red_stretches.csv`
+- 救護風險 3D（原型）：`output/sight.html`，用 Three.js 畫出紅色路段的路面高低與視線，可切換駕駛視角，看救護車是被坡頂還是彎道擋住
 - 汐五・五楊高架救護分工：`output/wuyang.html`（北上、南下各一張地圖與分段表），靜態圖 `output/map_wuyang_north.png`、`output/map_wuyang_south.png`，分段表 `output/wuyang_segments.csv`
 - 五楊高架救護派遣動畫（約 4 分 46 秒，給一般民眾看）：程式、旁白稿與語音在 [`video/`](video/README.md)，成品影片太大未放進 repo，可依 `video/README.md` 重現
 - 國道事故地圖：`output/crash.html`（A1＋A2 事故每 5 公里發生率，可切換「每億車公里」與「每公里每年」，另有「優先改善」檢視：事故多且救護慢的路段），靜態圖 `output/map_crash.png`（每公里每年），逐案資料 `output/crashes_freeway.csv`，分段結果 `output/crash_bins.csv`，各路段交通量 `output/traffic_sections.csv`
@@ -120,6 +121,8 @@
 | 10 | 國道3甲 西行 0.2K–1.3K（臺北市） | 1.2 km | 130 m | 平面彎道 |
 
 這是用公開地形與線形資料做的**篩選**，用來找出值得優先檢查的路段，不是實測的視距。模型沒有考慮護欄、隔音牆、邊坡、前方大車等遮蔽，也沒有考慮高公局實際的線形設計資料。詳見 [VERIFY.md](VERIFY.md)。
+
+**3D 原型**：`output/sight.html` 把這個模型畫成 3D（[線上看](https://shengwenhou.github.io/Highway-EMS-reachability/sight.html)）。選一段紅色路段，把駕駛沿著路往救護車推，畫面用每 20 m 的路面高程畫出道路、用兩道半透明牆表示模型假設的 ±6 m 視線範圍，並畫出駕駛眼睛（1.08 m）到救護車（1.0 m）的視線；「以 110 km/h 接近」會即時播放，看見救護車的那一刻會提示距離與所需的停車視距。畫面上的可用視距、停車視距與分級都直接取自 `sight_20m.csv`，和地圖一致。目前先收錄每種原因各最長的 16 段。
 
 ## 汐五・五楊高架救護分工
 
@@ -428,6 +431,7 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt   # 另需 ap
 .venv/bin/python scripts/06_trivia.py         # 冷知識圖卡 → output/trivia.html
 .venv/bin/python scripts/07_wuyang.py         # 汐五・五楊高架救護分工 → output/wuyang.html
 .venv/bin/python scripts/08_crashes.py        # 國道事故地圖（下載警政署 A1/A2 資料與高公局交通量）→ output/crash.html
+.venv/bin/python scripts/09_sight_scene.py    # 救護風險 3D 原型（只需 output/ 的 CSV）→ output/sight.html
 .venv/bin/python scripts/05_trace.py 3 南下 301 hospital   # （選用）印出某一段的實際路線
 ```
 
