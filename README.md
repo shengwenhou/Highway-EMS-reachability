@@ -1,6 +1,6 @@
 # Highway-EMS-reachability
 
-**🌐 網站：<https://shengwenhou.github.io/Highway-EMS-reachability/>**（互動地圖、[五楊高架與動畫](https://shengwenhou.github.io/Highway-EMS-reachability/wuyang.html)、[事故地圖](https://shengwenhou.github.io/Highway-EMS-reachability/crash.html)、[冷知識](https://shengwenhou.github.io/Highway-EMS-reachability/trivia.html)）
+**🌐 網站：<https://shengwenhou.github.io/Highway-EMS-reachability/>**（互動地圖、[五楊高架與動畫](https://shengwenhou.github.io/Highway-EMS-reachability/wuyang.html)、[北北桃跨區救護](https://shengwenhou.github.io/Highway-EMS-reachability/ranked.html)、[事故地圖](https://shengwenhou.github.io/Highway-EMS-reachability/crash.html)、[冷知識](https://shengwenhou.github.io/Highway-EMS-reachability/trivia.html)）
 
 台灣國道（國道 1、2、3、3甲、4、5、6、8、10 號）每一公里路段若發生事故，要回答兩個問題：
 
@@ -21,6 +21,8 @@
 - 救護風險紅色路段清單：`output/risk_red_stretches.csv`
 - 救護風險 3D（原型）：`output/sight.html`，用 Three.js 畫出紅色路段的路面高低與視線，可切換駕駛視角，看救護車是被坡頂還是彎道擋住
 - 汐五・五楊高架救護分工：`output/wuyang.html`（北上、南下各一張地圖與分段表），靜態圖 `output/map_wuyang_north.png`、`output/map_wuyang_south.png`，分段表 `output/wuyang_segments.csv`
+- 北北桃跨區救護：`output/ranked.html`（臺北市、新北市、桃園市境內國道，哪些路段由外縣市分隊最快到；點選路段可看前三順位的分隊與位置）
+- 臺北市、新北市、桃園市境內國道的前三順位分隊：`output/<縣市>_ranked_points.csv`（每 100 m 點位到場最快的三個分隊與時間），`output/<縣市>_cross_county.csv`（由外縣市分隊較快的路段、前三順位與本縣市最快分隊的差距），`<縣市>` 為 `taipei`、`newtaipei`、`taoyuan`，由 `scripts/10_county_ranked.py` 產生
 - 五楊高架救護派遣動畫（約 4 分 46 秒，給一般民眾看）：程式、旁白稿與語音在 [`video/`](video/README.md)，成品影片太大未放進 repo，可依 `video/README.md` 重現
 - 國道事故地圖：`output/crash.html`（A1＋A2 事故每 5 公里發生率，可切換「每億車公里」與「每公里每年」，另有「優先改善」檢視：事故多且救護慢的路段），靜態圖 `output/map_crash.png`（每公里每年），逐案資料 `output/crashes_freeway.csv`，分段結果 `output/crash_bins.csv`，各路段交通量 `output/traffic_sections.csv`
 - 冷知識圖卡：`output/trivia.html`，從資料挑出 14 件事，每則附位置示意圖，並可連到地圖查詢該點
