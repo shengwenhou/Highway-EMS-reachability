@@ -1,15 +1,16 @@
-"""臺北市境內國道：每個點位到場最快的前三個消防分隊，以及由外縣市分隊較快的路段。
+"""臺北市、新北市、桃園市境內國道：每個點位到場最快的前三個消防分隊，以及由外縣市分隊較快的路段。
 
 The main analysis (03_route.py) keeps only the winning station per point. Here every station
-near Taipei gets its own single-source Dijkstra (travel time), so each 100-m point inside
-臺北市 has a ranked list. Same model as 07_wuyang.py: free-flow speeds, no turnout time.
+near these counties gets its own single-source Dijkstra (travel time), so each 100-m point
+inside them has a ranked list. Same model as 07_wuyang.py: free-flow speeds, no turnout time.
 
 Run after 03_route.py and 04_maps.py (needs data/processed/stations_snapped.csv and
 output/points_100m.csv built from the same OSM extract).
 
 Outputs:
-  output/taipei_ranked_points.csv     every 100-m point in 臺北市: three fastest stations and times
-  output/taipei_cross_county.csv      contiguous stretches where a station of another county is fastest
+  output/<county>_ranked_points.csv   every 100-m point in the county: three fastest stations and times
+  output/<county>_cross_county.csv    contiguous stretches where a station of another county is fastest
+with <county> = taipei, newtaipei, taoyuan.
 """
 import importlib.util
 from pathlib import Path
@@ -33,8 +34,8 @@ def load(name, fname):
 r = load("route", "03_route.py")
 w = load("wuyang", "07_wuyang.py")
 
-COUNTY = "臺北市"
-CANDIDATE_RADIUS_KM = 15.0  # stations considered (straight line to the nearest point)
+COUNTIES = {"臺北市": "taipei", "新北市": "newtaipei", "桃園市": "taoyuan"}
+CANDIDATE_RADIUS_KM = 25.0  # stations considered (straight line to the nearest point)
 TIME_LIMIT_S = 45 * 60
 TOP = 3
 ELEVATED = ("汐止五股高架道路", "五股楊梅高架道路")
@@ -52,14 +53,14 @@ def compute():
 
     # tail node / offset / speed for every point, by re-sampling its chain exactly as 03 did
     rows = []
-    for ci in sorted(pts[pts.county == COUNTY].chain.unique()):
+    for ci in sorted(pts[pts.county.isin(COUNTIES)].chain.unique()):
         smp = r.sample_chain(chains[ci], nodes)
         p, ei = smp["p"], smp["ei"]
         sel = pts[pts.chain == ci].sort_values("s_m")
         assert len(sel) == len(smp["ss"]), "chain sampling differs from points_100m"
         kmh = np.array([ekmh.get((a, b), 100) for a, b in zip(p[ei], p[ei + 1])])
         df = sel.assign(tailnode=p[ei], off=smp["off"], kmh=kmh)
-        rows.append(df[df.county == COUNTY])
+        rows.append(df[df.county.isin(COUNTIES)])
     tp = pd.concat(rows, ignore_index=True)
 
     st = pd.read_csv(PROC / "stations_snapped.csv")
@@ -67,7 +68,7 @@ def compute():
     dx = (st.lon.values[:, None] - tp.lon.values[None, :]) * 111.32 * np.cos(lat0)
     dy = (st.lat.values[:, None] - tp.lat.values[None, :]) * 110.54
     cand = w.merge_colocated(st[np.hypot(dx, dy).min(axis=1) <= CANDIDATE_RADIUS_KM])
-    print(f"{len(tp)} points in {COUNTY}, {len(cand)} candidate stations (co-located units merged)")
+    print(f"{len(tp)} points in {'、'.join(COUNTIES)}, {len(cand)} candidate stations (co-located units merged)")
 
     g = r.sparse(edges, "sec", n)
     T = np.full((len(cand), len(tp)), np.inf)
@@ -83,8 +84,11 @@ def compute():
         tp[f"s{i+1}_county"] = cand.name.str[:3].values[k]
         tp[f"t{i+1}_min"] = np.round(T[k, cols] / 60, 2)
     # fastest station of the incident's own county, for the time saved by crossing the boundary
-    own = np.flatnonzero(cand.name.str.startswith(COUNTY).values)
-    k = own[np.argmin(T[own], axis=0)]
+    k = np.zeros(len(tp), int)
+    for county in COUNTIES:
+        own = np.flatnonzero(cand.name.str.startswith(county).values)
+        m = (tp.county == county).values
+        k[m] = own[np.argmin(T[own][:, m], axis=0)]
     tp["own_label"] = cand.label.values[k]
     tp["own_min"] = np.round(T[k, cols] / 60, 2)
     tp["own_rank"] = (T < T[k, cols]).sum(axis=0) + 1
@@ -101,17 +105,17 @@ def rng(a):
     return f"{a.min():.1f}–{a.max():.1f}"
 
 
-def segments(tp):
+def segments(tp, county):
     """Contiguous stretches (in travel order) where the same out-of-county station is fastest and the
     runners-up do not change."""
     out = []
     for (ci,), g in tp.groupby(["chain"]):
         g = g.sort_values("s_m").reset_index(drop=True)
-        gap = g.s_m.diff().fillna(0) > 150         # the carriageway leaves 臺北市 and comes back
-        key = g.s1 + "|" + g.s2 + "|" + g.s3
+        gap = g.s_m.diff().fillna(0) > 150         # the carriageway leaves the county and comes back
+        key = g.s1 + "|" + g.s2 + "|" + g.s3 + "|" + g.elevated.astype(str)
         blk = ((key != key.shift()) | gap).cumsum()
         for _, s in g.groupby(blk):
-            if s.s1_county.iloc[0] == COUNTY:
+            if s.s1_county.iloc[0] == county:
                 continue
             row = {"ref": s.ref.iloc[0], "direction": s.direction.iloc[0],
                    "type": "高架" if s.elevated.iloc[0] else "平面",
@@ -121,23 +125,25 @@ def segments(tp):
                 row[f"rank{i}"] = s[f"s{i}_county"].iloc[0] + s[f"s{i}_label"].iloc[0]
                 row[f"rank{i}_min"] = rng(s[f"t{i}_min"])
             own = s.own_label.value_counts().index[0]
-            row["taipei_best"] = own
-            row["taipei_best_min"] = rng(s.own_min)
-            row["taipei_best_rank"] = rng(s.own_rank).replace(".0", "")
+            row["own_best"] = own
+            row["own_best_min"] = rng(s.own_min)
+            row["own_best_rank"] = rng(s.own_rank).replace(".0", "")
             row["saved_min"] = rng(s.own_min - s.t1_min)
             out.append(row)
     return pd.DataFrame(out)
 
 
 def main():
-    tp = compute()
-    tp.to_csv(OUT / "taipei_ranked_points.csv", index=False, encoding="utf-8-sig")
-    seg = segments(tp)
-    seg.to_csv(OUT / "taipei_cross_county.csv", index=False, encoding="utf-8-sig")
-    cross = tp.s1_county != COUNTY
-    print(f"{cross.sum()} of {len(tp)} points ({cross.mean():.0%}) are reached fastest from another county")
-    pd.set_option("display.width", 300, "display.max_rows", 200, "display.max_columns", 30)
-    print(seg.to_string())
+    allp = compute()
+    pd.set_option("display.width", 300, "display.max_rows", 300, "display.max_columns", 30)
+    for county, slug in COUNTIES.items():
+        tp = allp[allp.county == county]
+        tp.to_csv(OUT / f"{slug}_ranked_points.csv", index=False, encoding="utf-8-sig")
+        seg = segments(tp, county)
+        seg.to_csv(OUT / f"{slug}_cross_county.csv", index=False, encoding="utf-8-sig")
+        cross = tp.s1_county != county
+        print(f"\n{county}: {cross.sum()} of {len(tp)} points ({cross.mean():.0%}) are reached fastest from another county")
+        print(seg.to_string())
 
 
 if __name__ == "__main__":

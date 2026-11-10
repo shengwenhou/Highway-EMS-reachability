@@ -1,4 +1,4 @@
-﻿ref,direction,type,km_start,km_end,length_km,rank1,rank1_min,rank2,rank2_min,rank3,rank3_min,taipei_best,taipei_best_min,taipei_best_rank,saved_min
+﻿ref,direction,type,km_start,km_end,length_km,rank1,rank1_min,rank2,rank2_min,rank3,rank3_min,own_best,own_best_min,own_best_rank,saved_min
 1,南下,平面,14.3,15.0,1.0,新北市社后分隊,5.0–5.5,新北市汐止分隊,5.1–5.6,新北市秀峰分隊,5.6–6.2,東湖分隊,8.0–8.6,5–5,3.0–3.0
 1,南下,高架,14.3,19.5,5.1,新北市社后分隊,5.0–8.0,新北市汐止分隊,5.1–8.1,新北市秀峰分隊,5.6–8.6,東湖分隊,8.0–11.0,5–5,3.0–3.0
 1,北上,平面,25.9,24.5,1.4,新北市重陽分隊,2.9–3.7,新北市慈福分隊,3.2–4.0,新北市三重分隊,3.6–4.4,大同分隊,4.5–5.3,4–4,1.6–1.6
