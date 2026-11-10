@@ -10,14 +10,20 @@ output/points_100m.csv built from the same OSM extract).
 Outputs:
   output/<county>_ranked_points.csv   every 100-m point in the county: three fastest stations and times
   output/<county>_cross_county.csv    contiguous stretches where a station of another county is fastest
+  output/ranked.html                  stand-alone page (map, top-three panel and table per county)
 with <county> = taipei, newtaipei, taoyuan.
 """
 import importlib.util
+import json
+import subprocess
 from pathlib import Path
+
+import geopandas as gpd
 
 import numpy as np
 import pandas as pd
 from scipy.sparse.csgraph import dijkstra
+from scipy.spatial import cKDTree
 
 ROOT = Path(__file__).resolve().parents[1]
 PROC = ROOT / "data" / "processed"
@@ -39,6 +45,13 @@ CANDIDATE_RADIUS_KM = 25.0  # stations considered (straight line to the nearest 
 TIME_LIMIT_S = 45 * 60
 TOP = 3
 ELEVATED = ("汐止五股高架道路", "五股楊梅高架道路")
+OVERLAP_M = 200             # surface 國1 points this close to the viaduct are drawn only in the 平面 view
+COUNTY_TOPO = ROOT / "data" / "raw" / "county" / "package" / "counties-10t.json"
+LEAFLET_CSS = "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"
+# categorical palette (dataviz reference, light / dark), one fixed slot per county of the fastest station
+COUNTY_COLOURS = {"臺北市": ("#2a78d6", "#3987e5"), "新北市": ("#eb6834", "#d95926"),
+                  "桃園市": ("#1baf7a", "#199e70"), "基隆市": ("#eda100", "#c98500"),
+                  "宜蘭縣": ("#e87ba4", "#d55181"), "新竹縣": ("#6250d6", "#9085e9")}
 
 
 def compute():
@@ -133,8 +146,81 @@ def segments(tp, county):
     return pd.DataFrame(out)
 
 
+def page(allp):
+    """Stand-alone page: per county, runs of points sharing the same three fastest stations."""
+    st = pd.read_csv(ROOT / "data" / "fire_stations.csv").drop_duplicates("name").set_index("name")
+    # 0 = drawn in both views, 1 = 平面 view only (under the viaduct), 2 = 高架 view only; a run of
+    # surface points takes the value of most of its points
+    x, y = r.to_m.transform(allp.lon.values, allp.lat.values)
+    lv = np.where(allp.elevated, 2, 0)
+    for d in allp.direction.unique():
+        el = (allp.elevated & (allp.direction == d)).values
+        su = (~allp.elevated & (allp.direction == d) & (allp.ref == "1")).values
+        if el.any() and su.any():
+            dist, _ = cKDTree(np.c_[x[el], y[el]]).query(np.c_[x[su], y[su]])
+            lv[np.flatnonzero(su)[dist <= OVERLAP_M]] = 1
+    allp = allp.assign(lv=lv)
+    stations, sidx = [], {}
+
+    def sid(name, label):
+        if name not in sidx:
+            sidx[name] = len(stations)
+            stations.append({"label": label, "county": name[:3],
+                             "lat": round(float(st.lat[name]), 5), "lon": round(float(st.lon[name]), 5)})
+        return sidx[name]
+
+    views = {}
+    for county in COUNTIES:
+        tp = allp[allp.county == county]
+        runs = []
+        for ci, g in tp.groupby("chain"):
+            g = g.sort_values("s_m").reset_index(drop=True)
+            gap = (g.s_m.diff().fillna(0) > 150).values
+            key = g.s1 + "|" + g.s2 + "|" + g.s3 + "|" + g.elevated.astype(str)
+            blk = ((key != key.shift()).values | gap).cumsum()
+            for b in np.unique(blk):
+                idx = np.flatnonzero(blk == b)
+                s_ = g.iloc[idx]
+                ll = [[round(a, 5), round(o, 5)] for a, o in zip(s_.lat, s_.lon)]
+                nxt = idx[-1] + 1
+                if nxt < len(g) and not gap[nxt]:      # join up with the next run on the map
+                    ll.append([round(float(g.lat[nxt]), 5), round(float(g.lon[nxt]), 5)])
+                runs.append({
+                    "ref": s_.ref.iloc[0], "dir": s_.direction.iloc[0],
+                    "d": 0 if s_.direction.iloc[0] in ("北上", "東行") else 1,
+                    "lv": 2 if s_.elevated.iloc[0] else int((s_.lv == 1).mean() > 0.5), "el": bool(s_.elevated.iloc[0]),
+                    "a": round(float(s_.km.iloc[0]), 1), "b": round(float(s_.km.iloc[-1]), 1),
+                    "len": round(len(s_) / 10, 1), "x": bool(s_.s1_county.iloc[0] != county), "ll": ll,
+                    "top": [[sid(s_[f"s{i}"].iloc[0], s_[f"s{i}_label"].iloc[0]),
+                             round(float(s_[f"t{i}_min"].min()), 1), round(float(s_[f"t{i}_min"].max()), 1)]
+                            for i in range(1, TOP + 1)],
+                    "own": [s_.own_label.value_counts().index[0], round(float(s_.own_min.min()), 1),
+                            round(float(s_.own_min.max()), 1), int(s_.own_rank.min()), int(s_.own_rank.max())],
+                    "sv": [round(float((s_.own_min - s_.t1_min).min()), 1),
+                           round(float((s_.own_min - s_.t1_min).max()), 1)]})
+        cross = tp.s1_county != county
+        views[county] = {"runs": runs, "n": int(len(tp)), "cross": int(cross.sum())}
+    counties = gpd.read_file(COUNTY_TOPO, layer="counties").set_crs(4326)
+    cty = counties.cx[allp.lon.min() - 0.35:allp.lon.max() + 0.35, allp.lat.min() - 0.3:allp.lat.max() + 0.3].copy()
+    cty["geometry"] = cty.geometry.simplify(0.0008)
+    data = {"palette": COUNTY_COLOURS, "stations": stations, "views": views,
+            "counties": json.loads(cty[["COUNTYNAME", "geometry"]].to_json())}
+    css = subprocess.run(["curl", "-sSfL", LEAFLET_CSS], capture_output=True, text=True, check=True).stdout
+    tpl = (ROOT / "scripts" / "ranked_template.html").read_text()
+    html = (tpl.replace("/*__LEAFLET_CSS__*/", css)
+               .replace("__DATA__", json.dumps(data, ensure_ascii=False, separators=(",", ":"))))
+    (OUT / "ranked.html").write_text(html)
+    print(f"ranked.html: {sum(len(v['runs']) for v in views.values())} runs, {len(stations)} stations, {len(html)/1e3:.0f} kB")
+
+
 def main():
     allp = compute()
+    allp.to_pickle(PROC / "county_ranked.pkl")   # lets `--page` rebuild the page without re-routing
+    report(allp)
+    page(allp)
+
+
+def report(allp):
     pd.set_option("display.width", 300, "display.max_rows", 300, "display.max_columns", 30)
     for county, slug in COUNTIES.items():
         tp = allp[allp.county == county]
@@ -147,4 +233,8 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    import sys
+    if "--page" in sys.argv:
+        page(pd.read_pickle(PROC / "county_ranked.pkl"))
+    else:
+        main()
