@@ -1,0 +1,333 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>北北桃國道：外縣市分隊比較快的路段</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@700;900&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/*__LEAFLET_CSS__*/
+/* Layout: the atlas-sheet identity of the main map. One map for the chosen county and direction,
+   a panel with the three fastest stations of the selected stretch, then the table of stretches. */
+:root {
+  --bg: #f5f6f2; --surface: #ffffff; --land: #e7eae3; --land-edge: #7d857b;
+  --fg: #1e2420; --muted: #5d665f; --rule: #d6dbd3; --accent: #0f5c4a; --own: #9aa39b; --warn: #b45309;
+  --font-display: "Noto Serif TC", "Songti TC", serif;
+  --font-body: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
+  --font-data: "IBM Plex Mono", ui-monospace, "SFMono-Regular", monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #131714; --surface: #1b201c; --land: #252b26; --land-edge: #6d766f;
+    --fg: #e8ece6; --muted: #9ba59d; --rule: #323a34; --accent: #5cc4a4; --own: #6b756d; --warn: #e0a15a; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #131714; --surface: #1b201c; --land: #252b26; --land-edge: #6d766f;
+  --fg: #e8ece6; --muted: #9ba59d; --rule: #323a34; --accent: #5cc4a4; --own: #6b756d; --warn: #e0a15a; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 15px; line-height: 1.6; }
+a { color: var(--accent); }
+.wrap { max-width: 1200px; margin: 0 auto; padding-inline: 16px; padding-block: 24px 48px; display: grid; gap: 28px; }
+header { display: grid; gap: 8px; }
+.back { font-size: 14px; font-weight: 700; text-decoration: none; }
+.eyebrow { font-size: 12px; letter-spacing: .12em; color: var(--accent); font-weight: 700; }
+h1 { font-family: var(--font-display); font-weight: 900; font-size: clamp(26px, 4.6vw, 40px); line-height: 1.2; margin: 0; text-wrap: balance; }
+.lede { color: var(--muted); max-width: 70ch; margin: 0; }
+.notice { font-size: 13px; border-left: 3px solid var(--accent); background: var(--surface); padding: 8px 12px; border-radius: 0 8px 8px 0; max-width: 80ch; }
+section { display: grid; gap: 12px; min-width: 0; }
+section h2 { font-family: var(--font-display); font-size: 24px; margin: 0; }
+.dirnote { font-size: 13px; color: var(--muted); margin: 0; max-width: 80ch; }
+
+.stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.stat { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 10px 14px; text-align: left; font: inherit; color: inherit; cursor: pointer; display: grid; gap: 2px; }
+.stat[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.stat .nm { font-weight: 700; font-size: 14px; }
+.stat .big { font-family: var(--font-data); font-size: clamp(22px, 5vw, 30px); font-weight: 500; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.stat .sub { font-size: 12px; color: var(--muted); }
+.stat:focus-visible, .seg button:focus-visible, .rowbtn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.controls { display: flex; flex-wrap: wrap; gap: 10px 20px; align-items: center; }
+.ctl { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+.seg { display: inline-flex; border: 1px solid var(--rule); border-radius: 8px; overflow: hidden; background: var(--surface); }
+.seg button { font: inherit; font-size: 14px; color: var(--fg); background: transparent; border: 0; padding: 6px 12px; cursor: pointer; min-height: 36px; }
+.seg button + button { border-left: 1px solid var(--rule); }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--surface); font-weight: 700; }
+
+.pair { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; align-items: start; }
+@media (min-width: 900px) { .pair { grid-template-columns: minmax(0, 1fr) 340px; } }
+.mapbox { border: 1px solid var(--rule); border-radius: 10px; overflow: hidden; }
+.map { height: min(66vh, 600px); min-height: 400px; background: var(--bg); }
+.leaflet-container { background: var(--bg); font-family: var(--font-body); }
+.leaflet-tooltip.st { background: var(--surface); color: var(--fg); border: 1.5px solid; font-weight: 700; font-size: 12px; padding: 1px 6px; box-shadow: none; }
+.leaflet-tooltip.st::before { display: none; }
+.leaflet-tooltip.cty { background: transparent; border: 0; box-shadow: none; color: var(--muted); font-size: 14px; font-weight: 700; }
+.leaflet-bar a { background: var(--surface); color: var(--fg); border-color: var(--rule); }
+.numicon { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; color: #fff; font-family: var(--font-data); font-weight: 500; font-size: 13px; border: 2px solid var(--surface); box-shadow: 0 1px 3px rgba(0,0,0,.35); }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 13px; padding: 8px 12px; background: var(--surface); border-top: 1px solid var(--rule); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend i { width: 18px; height: 5px; border-radius: 2px; display: inline-block; }
+
+.panel { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 14px 16px; display: grid; gap: 10px; }
+.panel h3 { margin: 0; font-size: 17px; line-height: 1.35; }
+.panel .where { font-size: 12.5px; color: var(--muted); }
+.panel ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.panel li { display: grid; grid-template-columns: 26px minmax(0, 1fr) auto; gap: 8px; align-items: center; }
+.panel .rk { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; color: #fff; font-family: var(--font-data); font-size: 13px; }
+.panel .nm { font-weight: 700; overflow-wrap: anywhere; }
+.panel .nm small { display: block; font-weight: 400; font-size: 12px; color: var(--muted); }
+.panel .t { font-family: var(--font-data); font-variant-numeric: tabular-nums; white-space: nowrap; font-size: 14px; }
+.panel .ownbox { border-top: 1px solid var(--rule); padding-top: 10px; font-size: 13.5px; }
+.panel .ownbox b { font-family: var(--font-data); font-weight: 500; }
+.panel .hint { color: var(--muted); font-size: 13.5px; margin: 0; }
+
+.tablebox { overflow-x: auto; border: 1px solid var(--rule); border-radius: 10px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+th, td { padding: 8px 10px; border-bottom: 1px solid var(--rule); text-align: left; vertical-align: top; }
+th { font-size: 12px; color: var(--muted); font-weight: 700; letter-spacing: .04em; white-space: nowrap; }
+td.num { font-family: var(--font-data); font-variant-numeric: tabular-nums; white-space: nowrap; }
+tbody tr { cursor: pointer; }
+tbody tr:hover, tbody tr.sel { background: color-mix(in srgb, var(--accent) 9%, transparent); }
+tr:last-child td { border-bottom: 0; }
+.rowbtn { font: inherit; font-family: var(--font-data); color: var(--accent); background: none; border: 0; padding: 0; cursor: pointer; text-align: left; text-decoration: underline; text-underline-offset: 3px; white-space: nowrap; }
+.sw { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: 0; }
+.stn { font-weight: 700; white-space: nowrap; }
+.small { font-size: 12px; color: var(--muted); }
+.tight { color: var(--warn); font-weight: 700; }
+footer { color: var(--muted); font-size: 13px; max-width: 80ch; display: grid; gap: 6px; border-top: 1px solid var(--rule); padding-top: 16px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <a class="back" href="index.html">← 回到國道救護可及性地圖</a>
+    <div class="eyebrow">臺北市 · 新北市 · 桃園市 · 以反應時間計</div>
+    <h1>北北桃國道：哪些路段，外縣市的救護車比較快？</h1>
+    <p class="lede">國道事故通常由所在縣市派車，但縣市界不是照匝道畫的。這裡把三個縣市境內的國道每 100 公尺取一點，讓附近每個消防分隊各跑一次最快路徑，列出到場最快的前三個分隊，並標出最快分隊屬於外縣市的路段。</p>
+    <div class="notice">時間是路網模型的行車時間：不塞車、不含出勤準備時間，救護車必須從上游的入口匝道上國道。這是「誰最近」的估算，不是各縣市實際的派遣分工；里程為推估值，誤差約 0.1 公里。</div>
+  </header>
+
+  <section aria-label="三個縣市的比例">
+    <div class="stats" id="stats"></div>
+  </section>
+
+  <section id="mapsec">
+    <h2 id="maptitle">地圖</h2>
+    <div class="controls">
+      <div class="ctl"><span id="lab-dir">行車方向</span>
+        <div class="seg" role="group" aria-labelledby="lab-dir" id="seg-dir">
+          <button type="button" data-v="0">北上・東行</button><button type="button" data-v="1">南下・西行</button>
+        </div>
+      </div>
+      <div class="ctl"><span id="lab-lv">國 1 高架重疊處</span>
+        <div class="seg" role="group" aria-labelledby="lab-lv" id="seg-lv">
+          <button type="button" data-v="1">看平面</button><button type="button" data-v="2">看高架</button>
+        </div>
+      </div>
+    </div>
+    <p class="dirnote">彩色路段由外縣市分隊最快到，顏色代表該分隊所屬縣市；灰色路段由本縣市分隊最快到。點選任一路段，可看前三順位的分隊與位置。</p>
+    <div class="pair">
+      <div class="mapbox">
+        <div class="map" id="map" aria-label="最快分隊所屬縣市地圖"></div>
+        <div class="legend" id="legend"></div>
+      </div>
+      <div class="panel" id="panel" aria-live="polite"></div>
+    </div>
+  </section>
+
+  <section id="tblsec">
+    <h2 id="tbltitle">路段表</h2>
+    <p class="dirnote">只列最快分隊屬於外縣市的路段，依國道與行車方向排列。「本縣市最快」是事故所在縣市自己最快的分隊，以及它比第 1 順位慢多久；差距不到 1 分鐘的以橘字標示，實務上可視為一樣快。點選一列會在地圖上顯示該路段。</p>
+    <div class="tablebox"><table id="tbl"></table></div>
+  </section>
+
+  <footer>
+    <div>同一路段內三個順位都相同才合併成一列，所以順位一換就會分段；縣市界在路上來回交錯的地方，也會出現很短的路段。同址的分隊視為同一個出發點。</div>
+    <div>候選分隊是三個縣市國道點位周邊 25 公里（直線）內的所有消防分隊。完整點位資料在 <a href="https://github.com/shengwenhou/Highway-EMS-reachability">GitHub</a> 的 <code>output/*_ranked_points.csv</code>。資料：© OpenStreetMap contributors、內政部消防署、taiwan-atlas 縣市界。</div>
+  </footer>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+const D = __DATA__;
+const COUNTIES = Object.keys(D.views);
+const dark = () => {
+  const t = document.documentElement.dataset.theme;
+  return t ? t === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+};
+const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const ccol = (county) => (D.palette[county] || ["#888", "#888"])[dark() ? 1 : 0];
+const rg = (a, b, u = "") => (a === b ? `${a.toFixed(1)}${u}` : `${a.toFixed(1)}–${b.toFixed(1)}${u}`);
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const roadName = (r) => `國 ${r.ref.replace("甲", " 甲")}${r.el ? " 高架" : ""}`;
+const kmText = (r) => (r.a === r.b ? `${r.a.toFixed(1)}K` : `${r.a.toFixed(1)}K → ${r.b.toFixed(1)}K`);
+const stn = (i) => D.stations[i];
+
+const S = { county: COUNTIES[0], d: 0, lv: 1, sel: null };
+const map = L.map("map", { zoomSnap: 0.25, preferCanvas: true });
+map.attributionControl.setPrefix(false).addAttribution("© OpenStreetMap contributors · 消防署");
+const countyLayer = L.geoJSON(D.counties, {
+  interactive: false,
+  style: () => ({ color: css("--land-edge"), weight: 1.6, dashArray: "6 5", fillColor: css("--land"), fillOpacity: 1 }),
+  onEachFeature: (f, layer) => layer.bindTooltip(f.properties.COUNTYNAME.replace("台", "臺"), { permanent: true, direction: "center", className: "cty" }),
+}).addTo(map);
+const lines = L.layerGroup().addTo(map), marks = L.layerGroup().addTo(map);
+
+const visible = (r) => r.d === S.d && (r.lv === 0 || r.lv === S.lv);
+const runColour = (r) => (r.x ? ccol(stn(r.top[0][0]).county) : css("--own"));
+
+function drawLines() {
+  lines.clearLayers();
+  const runs = D.views[S.county].runs;
+  // grey first, so coloured stretches stay on top where carriageways meet
+  // and the viaduct above the surface carriageway it partly covers
+  [0, 1, 2, 3].forEach((pass) => runs.forEach((r, i) => {
+    if (!visible(r) || (r.x ? 1 : 0) + (r.el ? 2 : 0) !== pass) return;
+    const ll = r.ll.length > 1 ? r.ll : [r.ll[0], r.ll[0]];
+    if (i === S.sel) L.polyline(ll, { color: css("--fg"), weight: 13, lineCap: "round", interactive: false }).addTo(lines);
+    L.polyline(ll, { color: runColour(r), weight: i === S.sel ? 7 : 6, lineCap: "butt" })
+      .on("click", () => select(i, false)).addTo(lines);
+  }));
+}
+
+function drawMarks() {
+  marks.clearLayers();
+  const runs = D.views[S.county].runs;
+  if (S.sel !== null) {
+    runs[S.sel].top.forEach(([si], k) => {
+      const s = stn(si);
+      L.marker([s.lat, s.lon], { icon: L.divIcon({ className: "", iconSize: [24, 24], iconAnchor: [12, 12],
+        html: `<div class="numicon" style="background:${ccol(s.county)}">${k + 1}</div>` }), keyboard: false })
+        .bindTooltip(s.label.replace(/（.*/, ""), { permanent: true, direction: "right", offset: [12, 0], className: "st" })
+        .addTo(marks);
+    });
+    return;
+  }
+  const seen = new Set();
+  runs.forEach((r) => {
+    if (!visible(r) || !r.x || seen.has(r.top[0][0])) return;
+    seen.add(r.top[0][0]);
+    const s = stn(r.top[0][0]);
+    L.circleMarker([s.lat, s.lon], { radius: 7, weight: 2.5, color: css("--surface"), fillColor: ccol(s.county), fillOpacity: 1, interactive: false })
+      .bindTooltip(s.label.replace(/（.*/, ""), { permanent: true, direction: "right", offset: [8, 0], className: "st" }).addTo(marks);
+  });
+}
+
+function legend() {
+  const runs = D.views[S.county].runs.filter(visible);
+  const present = [...new Set(runs.filter((r) => r.x).map((r) => stn(r.top[0][0]).county))];
+  document.getElementById("legend").innerHTML =
+    `<span><i style="background:${css("--own")}"></i>${S.county}分隊最快</span>` +
+    present.map((c) => `<span><i style="background:${ccol(c)}"></i>${c}分隊最快</span>`).join("");
+}
+
+function panel() {
+  const el = document.getElementById("panel");
+  if (S.sel === null) {
+    const v = D.views[S.county];
+    el.innerHTML = `<h3>${S.county}</h3><p class="hint">點選地圖上的路段，或下方表格的任一列，這裡會列出到場最快的前三個分隊，以及${S.county}自己最快的分隊。</p>` +
+      `<p class="hint">地圖上的圓點是目前畫面中「外縣市最快」路段的第 1 順位分隊。</p>`;
+    return;
+  }
+  const r = D.views[S.county].runs[S.sel];
+  const li = r.top.map(([si, a, b], k) => {
+    const s = stn(si);
+    const [name, note] = s.label.split("（");
+    return `<li><span class="rk" style="background:${ccol(s.county)}">${k + 1}</span>` +
+      `<span class="nm">${esc(s.county)}${esc(name)}${note ? `<small>（${esc(note)}</small>` : ""}</span>` +
+      `<span class="t">${rg(a, b, " 分")}</span></li>`;
+  }).join("");
+  const o = r.own;
+  const own = r.x
+    ? `${S.county}最快的是 <span class="stn">${esc(o[0])}</span>，<b>${rg(o[1], o[2], " 分")}</b>，排第 ${o[3] === o[4] ? o[3] : o[3] + "–" + o[4]}，` +
+      `<span class="${r.sv[0] < 1 ? "tight" : ""}">比第 1 順位慢 ${rg(r.sv[0], r.sv[1], " 分")}</span>。`
+    : `這一段由${S.county}自己的分隊最快到。`;
+  el.innerHTML = `<div><div class="where">${S.county}・${r.dir}・${r.el ? "高架" : "平面"}・${r.len.toFixed(1)} 公里</div>` +
+    `<h3>${roadName(r)} ${kmText(r)}</h3></div><ol>${li}</ol><div class="ownbox">${own}</div>`;
+}
+
+function table() {
+  const runs = D.views[S.county].runs;
+  const cell = ([si, a, b]) => {
+    const s = stn(si);
+    return `<td><span class="stn"><span class="sw" style="background:${ccol(s.county)}"></span>${esc(s.county)}${esc(s.label.replace(/（.*/, ""))}</span><div class="small num">${rg(a, b, " 分")}</div></td>`;
+  };
+  const rows = runs.map((r, i) => [r, i]).filter(([r]) => r.x);
+  document.getElementById("tbltitle").textContent = `${S.county}：外縣市分隊較快的路段（${rows.length} 段）`;
+  document.getElementById("tbl").innerHTML =
+    `<thead><tr><th>路段</th><th>第 1 順位</th><th>第 2 順位</th><th>第 3 順位</th><th>本縣市最快</th></tr></thead><tbody>` +
+    rows.map(([r, i]) => {
+      const o = r.own;
+      return `<tr data-i="${i}" class="${i === S.sel ? "sel" : ""}"><td><button type="button" class="rowbtn">${kmText(r)}</button>` +
+        `<div class="small">${roadName(r)} ${r.dir}・${r.len.toFixed(1)} km</div></td>` +
+        r.top.map(cell).join("") +
+        `<td><span class="stn">${esc(o[0].replace(/（.*/, ""))}</span><div class="small num">${rg(o[1], o[2], " 分")}・第 ${o[3] === o[4] ? o[3] : o[3] + "–" + o[4]}</div>` +
+        `<div class="small ${r.sv[0] < 1 ? "tight" : ""}">慢 ${rg(r.sv[0], r.sv[1], " 分")}</div></td></tr>`;
+    }).join("") + `</tbody>`;
+}
+
+function stats() {
+  document.getElementById("stats").innerHTML = COUNTIES.map((c) => {
+    const v = D.views[c];
+    return `<button type="button" class="stat" data-c="${c}" aria-pressed="${c === S.county}"><span class="nm">${c}</span>` +
+      `<span class="big">${Math.round(v.cross / v.n * 100)}%</span><span class="sub">${v.n.toLocaleString()} 個點位中 ${v.cross} 個由外縣市分隊最快</span></button>`;
+  }).join("");
+}
+
+function segs() {
+  document.querySelectorAll("#seg-dir button").forEach((b) => b.setAttribute("aria-pressed", String(+b.dataset.v === S.d)));
+  document.querySelectorAll("#seg-lv button").forEach((b) => b.setAttribute("aria-pressed", String(+b.dataset.v === S.lv)));
+  document.getElementById("maptitle").textContent = `${S.county}・${S.d ? "南下・西行" : "北上・東行"}`;
+}
+
+function fit() {
+  const pts = D.views[S.county].runs.filter(visible).flatMap((r) => r.ll);
+  if (pts.length) map.fitBounds(L.latLngBounds(pts).pad(0.12));
+}
+
+function render(refit) {
+  stats(); segs(); drawLines(); drawMarks(); legend(); panel(); table();
+  if (refit) fit();
+}
+
+function select(i, fromTable) {
+  const r = D.views[S.county].runs[i];
+  if (S.sel === i && !fromTable) { S.sel = null; render(false); return; }
+  S.sel = i; S.d = r.d;
+  if (r.lv) S.lv = r.lv;
+  render(false);
+  const pts = r.ll.concat(r.top.map(([si]) => [stn(si).lat, stn(si).lon]));
+  map.fitBounds(L.latLngBounds(pts).pad(0.25), { maxZoom: 14 });
+  if (fromTable) document.getElementById("mapsec").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+document.getElementById("stats").addEventListener("click", (e) => {
+  const b = e.target.closest(".stat"); if (!b) return;
+  S.county = b.dataset.c; S.sel = null; render(true);
+});
+document.getElementById("seg-dir").addEventListener("click", (e) => {
+  const b = e.target.closest("button"); if (!b) return;
+  S.d = +b.dataset.v; S.sel = null; render(true);
+});
+document.getElementById("seg-lv").addEventListener("click", (e) => {
+  const b = e.target.closest("button"); if (!b) return;
+  S.lv = +b.dataset.v; S.sel = null; render(false);
+});
+document.getElementById("tbl").addEventListener("click", (e) => {
+  const tr = e.target.closest("tbody tr"); if (tr) select(+tr.dataset.i, true);
+});
+map.on("click", () => { if (S.sel !== null) { S.sel = null; render(false); } });
+
+function retheme() {
+  countyLayer.setStyle({ color: css("--land-edge"), fillColor: css("--land") });
+  render(false);
+}
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", retheme);
+new MutationObserver(retheme).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+render(true);
+</script>
+</body>
+</html>

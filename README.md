@@ -1,6 +1,6 @@
 # Highway-EMS-reachability
 
-**🌐 網站：<https://shengwenhou.github.io/Highway-EMS-reachability/>**（互動地圖、[五楊高架與動畫](https://shengwenhou.github.io/Highway-EMS-reachability/wuyang.html)、[事故地圖](https://shengwenhou.github.io/Highway-EMS-reachability/crash.html)、[冷知識](https://shengwenhou.github.io/Highway-EMS-reachability/trivia.html)）
+**🌐 網站：<https://shengwenhou.github.io/Highway-EMS-reachability/>**（互動地圖、[五楊高架與動畫](https://shengwenhou.github.io/Highway-EMS-reachability/wuyang.html)、[北北桃跨區救護](https://shengwenhou.github.io/Highway-EMS-reachability/ranked.html)、[事故地圖](https://shengwenhou.github.io/Highway-EMS-reachability/crash.html)、[冷知識](https://shengwenhou.github.io/Highway-EMS-reachability/trivia.html)）
 
 台灣國道（國道 1、2、3、3甲、4、5、6、8、10 號）每一公里路段若發生事故，要回答兩個問題：
 
@@ -19,8 +19,11 @@
   - 救護風險：`output/map_risk.png`，救護車停在車道上時被後車追撞的風險（紅／黃／綠）
 - 跨區救護路段清單：`output/cross_county_segments.csv`
 - 救護風險紅色路段清單：`output/risk_red_stretches.csv`
+- 救護風險 3D（原型）：`output/sight.html`，用 Three.js 畫出紅色路段的路面高低與視線，可切換駕駛視角，看救護車是被坡頂還是彎道擋住
 - 汐五・五楊高架救護分工：`output/wuyang.html`（北上、南下各一張地圖與分段表），靜態圖 `output/map_wuyang_north.png`、`output/map_wuyang_south.png`，分段表 `output/wuyang_segments.csv`
 - 新交流道評估（國 1 × 北外環，大洲交流道）：逐點對照 `output/dazhou_points.csv`，說明見下方同名段落
+- 北北桃跨區救護：`output/ranked.html`（臺北市、新北市、桃園市境內國道，哪些路段由外縣市分隊最快到；點選路段可看前三順位的分隊與位置）
+- 臺北市、新北市、桃園市境內國道的前三順位分隊：`output/<縣市>_ranked_points.csv`（每 100 m 點位到場最快的三個分隊與時間，另附臺北市、新北市、桃園市各自最快的分隊與時間，欄位為 `taipei_`／`newtaipei_`／`taoyuan_` 加上 `label`、`min`，可直接比較任兩市誰較快；該市在 45 分鐘內到不了的點位留空），`output/<縣市>_cross_county.csv`（由外縣市分隊較快的路段、前三順位與本縣市最快分隊的差距），`<縣市>` 為 `taipei`、`newtaipei`、`taoyuan`，由 `scripts/10_county_ranked.py` 產生
 - 五楊高架救護派遣動畫（約 4 分 46 秒，給一般民眾看）：程式、旁白稿與語音在 [`video/`](video/README.md)，成品影片太大未放進 repo，可依 `video/README.md` 重現
 - 國道事故地圖：`output/crash.html`（A1＋A2 事故每 5 公里發生率，可切換「每億車公里」與「每公里每年」，另有「優先改善」檢視：事故多且救護慢的路段），靜態圖 `output/map_crash.png`（每公里每年），逐案資料 `output/crashes_freeway.csv`，分段結果 `output/crash_bins.csv`，各路段交通量 `output/traffic_sections.csv`
 - 冷知識圖卡：`output/trivia.html`，從資料挑出 14 件事，每則附位置示意圖，並可連到地圖查詢該點
@@ -121,6 +124,8 @@
 | 10 | 國道3甲 西行 0.2K–1.3K（臺北市） | 1.2 km | 130 m | 平面彎道 |
 
 這是用公開地形與線形資料做的**篩選**，用來找出值得優先檢查的路段，不是實測的視距。模型沒有考慮護欄、隔音牆、邊坡、前方大車等遮蔽，也沒有考慮高公局實際的線形設計資料。詳見 [VERIFY.md](VERIFY.md)。
+
+**3D 原型**：`output/sight.html` 把這個模型畫成 3D（[線上看](https://shengwenhou.github.io/Highway-EMS-reachability/sight.html)）。選一段紅色路段，把駕駛沿著路往救護車推，畫面用每 20 m 的路面高程畫出道路、用兩道半透明牆表示模型假設的 ±6 m 視線範圍，並畫出駕駛眼睛（1.08 m）到救護車（1.0 m）的視線；「以 110 km/h 接近」會即時播放，看見救護車的那一刻會提示距離與所需的停車視距。畫面上的可用視距、停車視距與分級都直接取自 `sight_20m.csv`，和地圖一致。目前先收錄每種原因各最長的 16 段。
 
 ## 汐五・五楊高架救護分工
 
@@ -466,6 +471,7 @@
 ```bash
 python3 -m venv .venv && .venv/bin/pip install -r requirements.txt   # 另需 apt install osmium-tool
 .venv/bin/python scripts/01_fetch_osm.py      # 下載 OSM（約 2.2 GB）並切出台灣道路
+# 或：.venv/bin/python scripts/01_fetch_osm.py --geofabrik   # 改抓 Geofabrik 的臺灣圖資（約 310 MB），不需 osmium-tool，macOS 可直接跑
 .venv/bin/python scripts/02_fire_stations.py  # 消防分隊清單 → data/fire_stations.csv
 # data/heavy_er_hospitals.csv 為人工整理自衛福部名單（見「方法」第 5 點），直接隨 repo 提供
 .venv/bin/python scripts/03_route.py          # 建圖、路徑計算 → data/processed/
@@ -475,6 +481,7 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt   # 另需 ap
 .venv/bin/python scripts/07_wuyang.py         # 汐五・五楊高架救護分工 → output/wuyang.html
 .venv/bin/python scripts/08_crashes.py        # 國道事故地圖（下載警政署 A1/A2 資料與高公局交通量）→ output/crash.html
 .venv/bin/python scripts/09_dazhou.py         # 新交流道評估：國 1 × 北外環，有／無新匝道對照 → output/dazhou_points.csv
+.venv/bin/python scripts/09_sight_scene.py    # 救護風險 3D 原型（只需 output/ 的 CSV）→ output/sight.html
 .venv/bin/python scripts/05_trace.py 3 南下 301 hospital   # （選用）印出某一段的實際路線
 ```
 

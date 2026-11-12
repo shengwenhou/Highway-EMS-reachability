@@ -1,0 +1,645 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>救護風險 3D：看得到停在車道上的救護車嗎？</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Noto+Serif+TC:wght@700;900&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root {
+  --bg: #f5f6f2; --surface: #ffffff; --fg: #1e2420; --muted: #5d665f; --rule: #d6dbd3; --accent: #0f5c4a;
+  --red: #d33a2c; --yellow: #d9b310; --green: #1f9e5a; --blue: #1d4ed8;
+  --font-display: "Noto Serif TC", "Songti TC", serif;
+  --font-body: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
+  --font-data: "IBM Plex Mono", ui-monospace, "SFMono-Regular", monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #131714; --surface: #1b201c; --fg: #e8ece6; --muted: #9ba59d; --rule: #323a34; --accent: #5cc4a4;
+    --red: #ec5a4a; --yellow: #e8c42e; --green: #34b874; --blue: #60a5fa; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #131714; --surface: #1b201c; --fg: #e8ece6; --muted: #9ba59d; --rule: #323a34; --accent: #5cc4a4;
+  --red: #ec5a4a; --yellow: #e8c42e; --green: #34b874; --blue: #60a5fa; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 15px; line-height: 1.6; }
+.wrap { max-width: 1200px; margin: 0 auto; padding: 24px 16px 40px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; }
+.wrap > * { min-width: 0; }
+header { display: grid; gap: 8px; }
+.back { font-size: 14px; color: var(--accent); text-decoration: none; font-weight: 700; }
+.back:hover { text-decoration: underline; }
+.eyebrow { font-size: 12px; letter-spacing: .12em; color: var(--accent); font-weight: 700; }
+h1 { font-family: var(--font-display); font-weight: 900; font-size: clamp(24px, 4.2vw, 38px); line-height: 1.2; margin: 0; text-wrap: balance; }
+h2 { font-family: var(--font-display); font-size: 20px; margin: 0 0 6px; }
+.lede { color: var(--muted); max-width: 70ch; margin: 0; }
+.notice { background: var(--surface); border: 1px solid var(--rule); border-left: 4px solid var(--accent); border-radius: 10px; padding: 10px 14px; font-size: 14px; max-width: 80ch; }
+.notice a, .lede a { color: var(--accent); }
+.panel { display: grid; gap: 12px; }
+.controls { display: grid; gap: 10px 18px; grid-template-columns: minmax(0, 1fr); background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; padding: 12px 16px; }
+@media (min-width: 820px) { .controls { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr) auto; align-items: end; } }
+.ctl { display: grid; gap: 4px; font-size: 13px; color: var(--muted); font-weight: 700; }
+.ctl select, .ctl input[type=range] { width: 100%; }
+.ctl select { max-width: 100%; font: inherit; font-size: 14px; color: var(--fg); background: var(--bg); border: 1px solid var(--rule); border-radius: 8px; padding: 6px 8px; }
+.ctl .val { font-family: var(--font-data); color: var(--fg); font-weight: 500; }
+.btns { display: flex; flex-wrap: wrap; gap: 8px; }
+button { font: inherit; font-size: 14px; font-weight: 700; border-radius: 8px; border: 1px solid var(--accent); background: var(--surface); color: var(--accent); padding: 7px 14px; cursor: pointer; }
+button.on, button.primary { background: var(--accent); color: var(--surface); }
+button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.stage { position: relative; border: 1px solid var(--rule); border-radius: 12px; overflow: hidden; background: #0b1220; aspect-ratio: 16 / 9; max-height: 640px; }
+.stage canvas { display: block; width: 100%; height: 100%; }
+.stage .labels { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.lab { position: absolute; transform: translate(-50%, -120%); white-space: nowrap; font-size: 13px; font-weight: 700; padding: 2px 8px; border-radius: 6px;
+  background: rgba(11, 18, 32, .78); color: #eef3f8; border: 1px solid rgba(255,255,255,.2); }
+.lab.amb { background: #d33a2c; border-color: #d33a2c; color: #fff; }
+.lab.drv { background: #1d4ed8; border-color: #1d4ed8; color: #fff; }
+.lab.blk { background: #ffb547; border-color: #ffb547; color: #0b1220; }
+.lab.post { font-size: 11px; font-weight: 500; padding: 1px 5px; background: rgba(11,18,32,.6); border: 0; color: #c9d5e3; transform: translate(-50%, -140%); }
+.stagebox { position: relative; display: grid; gap: 8px; }
+.hud { position: absolute; left: 12px; top: 12px; max-width: min(360px, calc(100% - 24px)); background: rgba(11, 18, 32, .86); color: #eef3f8; border: 1px solid rgba(255,255,255,.18);
+  border-radius: 10px; padding: 10px 14px; font-size: 13px; line-height: 1.5; display: grid; gap: 2px; }
+.hud .t { font-weight: 700; font-size: 14px; }
+.hud .row { display: flex; justify-content: space-between; gap: 14px; }
+.hud .row span:last-child { font-family: var(--font-data); white-space: nowrap; }
+.hud .st { margin-top: 4px; padding: 6px 10px; border-radius: 8px; font-weight: 700; text-align: center; }
+.hud .st.ok { background: #1f9e5a; color: #fff; }
+.hud .st.no { background: #d33a2c; color: #fff; }
+.hud .st.warn { background: #ffb547; color: #0b1220; }
+.toast { position: absolute; left: 50%; bottom: 18px; transform: translateX(-50%); background: rgba(0,0,0,.72); color: #fff; font-size: 18px; font-weight: 700;
+  padding: 8px 20px; border-radius: 10px; white-space: nowrap; opacity: 0; transition: opacity .3s; pointer-events: none; }
+.toast.show { opacity: 1; }
+@media (max-width: 700px) { .stage { aspect-ratio: 4 / 3; } .hud { position: static; max-width: none; } }
+.hint { position: absolute; right: 12px; bottom: 12px; font-size: 12px; color: rgba(238,243,248,.7); background: rgba(11,18,32,.6); padding: 3px 8px; border-radius: 6px; }
+.charts { display: grid; gap: 12px; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 820px) { .charts { grid-template-columns: 3fr 2fr; } }
+.chartbox { background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; padding: 10px 12px 6px; }
+.chartbox h3 { margin: 0 0 4px; font-size: 14px; }
+.chartbox p { margin: 0; font-size: 12px; color: var(--muted); }
+.chartbox svg { display: block; width: 100%; height: auto; overflow: visible; }
+.chartbox svg text { font-size: 11px; fill: var(--muted); font-family: var(--font-data); }
+.chartbox svg .grid line { stroke: var(--rule); }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13px; color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend i { width: 14px; height: 14px; border-radius: 3px; display: inline-block; }
+.tablebox { overflow-x: auto; background: var(--surface); border: 1px solid var(--rule); border-radius: 12px; }
+table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+th, td { padding: 7px 10px; border-bottom: 1px solid var(--rule); text-align: left; white-space: nowrap; }
+th { font-size: 12px; color: var(--muted); font-weight: 700; }
+td.num { font-family: var(--font-data); font-variant-numeric: tabular-nums; }
+tr.sel td { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+tbody tr { cursor: pointer; }
+tbody tr:hover td { background: color-mix(in srgb, var(--accent) 7%, transparent); }
+tr:last-child td { border-bottom: 0; }
+.sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
+footer { color: var(--muted); font-size: 13px; max-width: 80ch; display: grid; gap: 6px; border-top: 1px solid var(--rule); padding-top: 16px; }
+footer a { color: var(--accent); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <a class="back" href="index.html">← 回到國道救護可及性地圖</a>
+    <div class="eyebrow">救護風險 · 3D 原型 · 依視距模型</div>
+    <h1>看得到停在車道上的救護車嗎？</h1>
+    <p class="lede">救護車停在國道車道上處理事故時，後方以 110 km/h 駛來的駕駛，要在多遠之外看見它、能不能煞得住？這一頁把<a href="index.html">救護風險地圖</a>的計算畫成 3D：選一段紅色路段，把駕駛沿著路往前推，看視線是被坡頂切掉，還是飄出了彎道。</p>
+    <div class="notice">畫面上的路面高低、可用視距與停車視距，都直接取自 <code>sight_20m.csv</code>（每 20 m 一點），和地圖上的數字一致。地形只有道路中心線的剖面，沒有畫出真實地貌、護欄與隔音牆；模型假設車道中心兩側 6 m 以外的東西都會擋住視線，畫面上用兩道半透明的牆表示。詳細假設見 <a href="https://github.com/shengwenhou/Highway-EMS-reachability/blob/main/VERIFY.md">VERIFY.md</a>。</div>
+  </header>
+
+  <section class="panel">
+    <div class="controls">
+      <label class="ctl"><span>紅色路段（本頁 32 段／全部 <span id="n-red"></span> 段）</span><select id="sel"></select></label>
+      <label class="ctl"><span>救護車停在 <span class="val" id="ti-val"></span></span><input type="range" id="ti" min="0" max="1" step="1"></label>
+      <label class="ctl"><span>駕駛距離救護車 <span class="val" id="d-val"></span></span><input type="range" id="d" min="0" max="600" step="10"></label>
+      <div class="btns">
+        <button id="play" class="primary">▶ 以 110 km/h 接近</button>
+        <button id="v-drive" class="on">駕駛視角</button>
+        <button id="v-orbit">俯瞰</button>
+        <button id="exag" title="俯瞰時把高低差放大三倍，坡頂比較容易看出來">高程 ×1</button>
+      </div>
+    </div>
+    <div class="stagebox">
+      <div class="stage" id="stage">
+        <div class="labels" id="labels"></div>
+        <div class="toast" id="toast"></div>
+        <div class="hint" id="hint">拖曳旋轉、滾輪縮放</div>
+      </div>
+      <div class="hud" id="hud"></div>
+    </div>
+    <div class="legend">
+      <span><i style="background:#d33a2c"></i>紅：可用視距 &lt; 停車視距</span>
+      <span><i style="background:#d9b310"></i>黃：停車視距 ≤ 可用視距 &lt; 335 m</span>
+      <span><i style="background:#1f9e5a"></i>綠：可用視距 ≥ 335 m（決策視距）</span>
+      <span><i style="background:#ff4d4d;opacity:.5"></i>路面上的紅帶：從這裡開始煞車才停得住（停車視距）</span>
+      <span><i style="background:#9aa3ad;opacity:.6"></i>半透明牆：模型的視線範圍邊界（中心線 ±6 m）</span>
+    </div>
+  </section>
+
+  <section class="charts">
+    <div class="chartbox">
+      <h3>縱斷面：路面高程（高度放大）</h3>
+      <p>藍點是駕駛的眼睛（路面上 1.08 m），紅點是救護車的可見高度（1.0 m）。兩點之間的直線若穿進路面，就是被坡頂擋住。</p>
+      <svg id="prof" viewBox="0 0 720 220" role="img" aria-label="路面縱斷面與視線"></svg>
+    </div>
+    <div class="chartbox">
+      <h3>平面：路線與視線</h3>
+      <p>視線是駕駛到救護車的直線。它離道路中心線最遠超過 6 m 時，就是被彎道擋住。</p>
+      <svg id="plan" viewBox="0 0 440 220" role="img" aria-label="路線平面圖與視線"></svg>
+    </div>
+  </section>
+
+  <section>
+    <h2>本頁收錄的路段</h2>
+    <p class="lede" style="font-size:14px">每種原因各取最長的 16 段。「最短視距」是該段內最差的 20 m 點；「停車視距」是該點以 110 km/h、2.5 秒反應、3.4 m/s² 減速並依坡度修正後所需的距離。完整清單在 <code>risk_red_stretches.csv</code>。</p>
+    <div class="tablebox"><table id="tbl"><thead><tr><th>#</th><th>路段</th><th>縣市</th><th>原因</th><th>長度</th><th>最短視距</th><th>停車視距</th></tr></thead><tbody></tbody></table></div>
+  </section>
+
+  <footer>
+    <div>方法：每 20 m 假設一台救護車停在車道上，往上游回看，算出後方駕駛最遠能在多遠之外看見它（可用視距）。視線在兩種情況下被擋住：路面中心線偏離視線超過 6 m（平面彎道），或路面高過駕駛眼高 1.08 m 到救護車 1.0 m 的連線（縱坡坡頂）。與 110 km/h 的停車視距（約 210–230 m，依坡度修正）和決策視距 335 m 比較後分為紅、黃、綠。</div>
+    <div>限制：高程來自 Copernicus GLO-30 地表模型，經過濾波與平滑；路線來自 OpenStreetMap 中心線。沒有考慮前方大車、夜間、雨霧、彎道超高、實際車速與警示設施。救護車車頂約 2.5 m 高又有警示燈，實際上可能更早被看見。這是篩選工具，不是實測視距。</div>
+    <div>資料：© OpenStreetMap contributors（ODbL）、Copernicus GLO-30 DEM（ESA）。程式碼 MIT，<a href="https://github.com/shengwenhou/Highway-EMS-reachability">GitHub</a>。</div>
+  </footer>
+</div>
+
+<script type="importmap">{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/" } }</script>
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+
+const D = __DATA__;
+const EYE = 1.08, OBJ = 1.0, CLEAR = 6, DSD = 335, SPEED = 110 / 3.6, LOOK_MAX = 600;
+const RISK_HEX = { "-1": 0x6b7280, 0: 0x1f9e5a, 1: 0xd9b310, 2: 0xd33a2c };
+const LIMIT_NAME = ["", "平面彎道", "縱坡坡頂", "資料起點"];
+const $ = (id) => document.getElementById(id);
+const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
+const fmt = (v, n = 0) => Number(v).toFixed(n);
+
+// ---------- state ----------
+const state = { si: 0, ti: 0, d: 300, view: "drive", exag: 1, playing: false, seenAt: null, userOrbit: false };
+let S = null;             // current stretch
+let zmin = 0;
+
+// ---------- renderer ----------
+const stage = $("stage");
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+stage.prepend(renderer.domElement);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x15203a);
+scene.fog = new THREE.Fog(0x15203a, 900, 2000);
+const camera = new THREE.PerspectiveCamera(55, 16 / 9, 0.5, 5000);
+scene.add(new THREE.HemisphereLight(0xbcd3ff, 0x1a2230, 1.1));
+const sun = new THREE.DirectionalLight(0xffffff, 1.0);
+sun.position.set(-300, 500, 200);
+scene.add(sun);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.maxPolarAngle = Math.PI / 2 - 0.02;
+controls.addEventListener("start", () => { state.userOrbit = true; });
+const world = new THREE.Group();
+scene.add(world);
+
+function resize() {
+  const w = stage.clientWidth, h = stage.clientHeight;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}
+new ResizeObserver(resize).observe(stage);
+resize();
+
+// ---------- geometry helpers ----------
+// world units are metres; y up = (elevation - zmin + h) * exaggeration; z = -north
+const P = (i, h = 0) => new THREE.Vector3(S.x[i], (S.z[i] - zmin + h) * state.exag, -S.y[i]);
+// position at road distance s (metres from the first point): interpolated along the polyline
+function at(s, h = 0) {
+  const n = S.s.length;
+  if (s <= S.s[0]) return P(0, h);
+  if (s >= S.s[n - 1]) return P(n - 1, h);
+  let j = 0;
+  while (j < n - 2 && S.s[j + 1] <= s) j++;
+  const f = (s - S.s[j]) / (S.s[j + 1] - S.s[j]);
+  return P(j, h).lerp(P(j + 1, h), f);
+}
+function tangentAt(s) {
+  const a = at(Math.max(S.s[0], s - 10)), b = at(Math.min(S.s[S.s.length - 1], s + 10));
+  return b.sub(a).setY(0).normalize();
+}
+function ribbon(pts, w, mat, colors) {
+  const pos = [], idx = [], col = [];
+  for (let i = 0; i < pts.length; i++) {
+    const a = pts[Math.max(0, i - 1)], b = pts[Math.min(pts.length - 1, i + 1)];
+    const d = new THREE.Vector3().subVectors(b, a).setY(0).normalize();
+    const n = new THREE.Vector3(-d.z, 0, d.x).multiplyScalar(w / 2);
+    pos.push(pts[i].x + n.x, pts[i].y, pts[i].z + n.z, pts[i].x - n.x, pts[i].y, pts[i].z - n.z);
+    if (colors) { const c = colors[i]; col.push(c.r, c.g, c.b, c.r, c.g, c.b); }
+    if (i) idx.push(2 * i - 2, 2 * i - 1, 2 * i, 2 * i - 1, 2 * i + 1, 2 * i);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+  if (colors) g.setAttribute("color", new THREE.Float32BufferAttribute(col, 3));
+  g.setIndex(idx);
+  g.computeVertexNormals();
+  return new THREE.Mesh(g, mat);
+}
+// vertical wall along the polyline, offset to one side
+function wall(pts, offset, h0, h1, mat) {
+  const pos = [], idx = [];
+  for (let i = 0; i < pts.length; i++) {
+    const a = pts[Math.max(0, i - 1)], b = pts[Math.min(pts.length - 1, i + 1)];
+    const d = new THREE.Vector3().subVectors(b, a).setY(0).normalize();
+    const n = new THREE.Vector3(-d.z, 0, d.x).multiplyScalar(offset);
+    pos.push(pts[i].x + n.x, pts[i].y + h0 * state.exag, pts[i].z + n.z, pts[i].x + n.x, pts[i].y + h1 * state.exag, pts[i].z + n.z);
+    if (i) idx.push(2 * i - 2, 2 * i - 1, 2 * i, 2 * i - 1, 2 * i + 1, 2 * i);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+  g.setIndex(idx);
+  g.computeVertexNormals();
+  return new THREE.Mesh(g, mat);
+}
+function dashed(pts, color) {
+  const g = new THREE.BufferGeometry().setFromPoints(pts);
+  const l = new THREE.Line(g, new THREE.LineDashedMaterial({ color, dashSize: 6, gapSize: 9, transparent: true, opacity: 0.7 }));
+  l.computeLineDistances();
+  return l;
+}
+
+// ---------- materials ----------
+const matRoad = new THREE.MeshLambertMaterial({ color: 0x30343b, side: THREE.DoubleSide });
+const matEarth = new THREE.MeshLambertMaterial({ color: 0x2c3b30, side: THREE.DoubleSide });
+const matStrip = new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide });
+const matWall = new THREE.MeshLambertMaterial({ color: 0xb7bec8, transparent: true, opacity: 0.85, side: THREE.DoubleSide, depthWrite: false });
+const matSSD = new THREE.MeshBasicMaterial({ color: 0xff4d4d, transparent: true, opacity: 0.16, side: THREE.DoubleSide, depthWrite: false });
+const matRedBand = new THREE.MeshBasicMaterial({ color: 0xd33a2c, transparent: true, opacity: 0.18, side: THREE.DoubleSide, depthWrite: false });
+const matPost = new THREE.MeshLambertMaterial({ color: 0xc9d5e3 });
+
+// ---------- build a stretch ----------
+let roadPts = [], strip, ssdBand, posts = [], blockMark, sightLine, amb, drv, lightA, lightB, objDot, walls = [];
+function build() {
+  while (world.children.length) { const o = world.children.pop(); o.traverse((c) => { c.geometry?.dispose(); }); }
+  posts = []; walls = [];
+  zmin = Math.min(...S.z);
+  roadPts = S.s.map((_, i) => P(i));
+  const n = roadPts.length;
+  // ground far below the road, so crests and sags read as terrain
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(6000, 6000), new THREE.MeshLambertMaterial({ color: 0x151d2b }));
+  ground.rotation.x = -Math.PI / 2;
+  ground.position.y = -6 * state.exag;
+  world.add(ground);
+  world.add(ribbon(roadPts.map((p) => p.clone().setY(p.y - 0.3 * state.exag)), 70, matEarth));
+  world.add(ribbon(roadPts, 2 * CLEAR, matRoad));
+  // lane edge lines (the ambulance lane, 3.5 m)
+  for (const off of [-1.75, 1.75]) {
+    const pts = roadPts.map((p, i) => {
+      const a = roadPts[Math.max(0, i - 1)], b = roadPts[Math.min(n - 1, i + 1)];
+      const d = new THREE.Vector3().subVectors(b, a).setY(0).normalize();
+      return new THREE.Vector3(p.x - d.z * off, p.y + 0.03, p.z + d.x * off);
+    });
+    world.add(dashed(pts, 0xe5e7eb));
+  }
+  // risk strip down the centre
+  strip = ribbon(roadPts.map((p) => p.clone().setY(p.y + 0.06)), 0.9, matStrip, S.risk.map((r) => new THREE.Color(RISK_HEX[r])));
+  world.add(strip);
+  // faint band over the whole red stretch
+  const [r0, r1] = S.range;
+  const band = ribbon(roadPts.slice(r0, r1 + 1).map((p) => p.clone().setY(p.y + 0.04)), 2 * CLEAR, matRedBand);
+  world.add(band);
+  // sight-corridor walls
+  for (const off of [-CLEAR, CLEAR]) { const w = wall(roadPts, off, 0, 1.5, matWall); walls.push(w); world.add(w); }
+  // ambulance
+  amb = new THREE.Group();
+  const body = new THREE.Mesh(new THREE.BoxGeometry(5.6, 2.3, 2.1), new THREE.MeshLambertMaterial({ color: 0xffffff, emissive: 0x8a8f96 }));
+  body.position.y = 1.15 + 0.35;
+  const cab = new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.4, 2.0), new THREE.MeshLambertMaterial({ color: 0xffffff, emissive: 0x7a7f86 }));
+  cab.position.set(3.4, 0.7 + 0.35, 0);
+  const stripe = new THREE.Mesh(new THREE.BoxGeometry(5.62, 0.35, 2.12), new THREE.MeshBasicMaterial({ color: 0xd33a2c }));
+  stripe.position.y = 0.95 + 0.35;
+  lightA = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.35, 0.8), new THREE.MeshBasicMaterial({ color: 0xff3b3b }));
+  lightB = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.35, 0.8), new THREE.MeshBasicMaterial({ color: 0x3b7bff }));
+  lightA.position.set(-0.3, 2.3 + 0.35 + 0.12, 0.6); lightB.position.set(-0.3, 2.3 + 0.35 + 0.12, -0.6);
+  objDot = new THREE.Mesh(new THREE.SphereGeometry(0.22, 16, 12), new THREE.MeshBasicMaterial({ color: 0x19d3ff }));
+  objDot.position.set(-2.9, OBJ, 0);
+  amb.add(body, cab, stripe, lightA, lightB, objDot);
+  world.add(amb);
+  // approaching car (hidden in driver view)
+  drv = new THREE.Group();
+  const cbody = new THREE.Mesh(new THREE.BoxGeometry(4.4, 1.0, 1.8), new THREE.MeshLambertMaterial({ color: 0x1d4ed8, emissive: 0x0a1f5c }));
+  cbody.position.y = 0.8;
+  const croof = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.6, 1.6), new THREE.MeshLambertMaterial({ color: 0x3b82f6 }));
+  croof.position.set(-0.2, 1.6, 0);
+  const eye = new THREE.Mesh(new THREE.SphereGeometry(0.18, 12, 10), new THREE.MeshBasicMaterial({ color: 0x19d3ff }));
+  eye.position.set(0.3, EYE, 0);
+  drv.add(cbody, croof, eye);
+  world.add(drv);
+  // sight line and blocking marker
+  sightLine = new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]), new THREE.LineBasicMaterial({ color: 0x3ddc97 }));
+  world.add(sightLine);
+  blockMark = new THREE.Mesh(new THREE.RingGeometry(1.6, 2.4, 40), new THREE.MeshBasicMaterial({ color: 0xffb547, side: THREE.DoubleSide, transparent: true, opacity: 0.9, depthWrite: false }));
+  blockMark.rotation.x = -Math.PI / 2;
+  world.add(blockMark);
+  ssdBand = null;
+  rebuildDynamic(true);
+}
+
+// things that depend on the ambulance position
+function rebuildDynamic(resetCamera) {
+  const ti = state.ti, sA = S.s[ti];
+  // ambulance pose
+  const tA = tangentAt(sA);
+  amb.position.copy(at(sA));
+  amb.rotation.y = Math.atan2(-tA.z, tA.x);
+  amb.scale.set(1, state.exag, 1);
+  // stopping-distance band behind the ambulance
+  if (ssdBand) { world.remove(ssdBand); ssdBand.geometry.dispose(); }
+  const ssd = S.ssd[ti];
+  const bandPts = [];
+  for (let s = Math.max(S.s[0], sA - ssd); s < sA; s += 10) bandPts.push(at(s, 0.09));
+  bandPts.push(at(sA, 0.09));
+  ssdBand = ribbon(bandPts, 2 * CLEAR - 0.4, matSSD);
+  world.add(ssdBand);
+  // distance posts every 100 m upstream
+  for (const p of posts) { world.remove(p.mesh); p.mesh.geometry.dispose(); }
+  posts = [];
+  for (let m = 100; m <= LOOK_MAX; m += 100) {
+    const s = sA - m;
+    if (s < S.s[0]) break;
+    const t = tangentAt(s);
+    const mesh = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 1.2, 8), matPost);
+    mesh.position.copy(at(s, 0.6)).add(new THREE.Vector3(-t.z, 0, t.x).multiplyScalar(CLEAR - 0.6));
+    world.add(mesh);
+    posts.push({ mesh, m, top: mesh.position.clone().add(new THREE.Vector3(0, 0.7, 0)) });
+  }
+  if (resetCamera) state.userOrbit = false;
+  update();
+}
+
+// ---------- the sight line ----------
+function sightInfo() {
+  const ti = state.ti, sA = S.s[ti], d = state.d;
+  const sE = sA - d;
+  const asd = S.asd[ti], ssd = S.ssd[ti], lim = S.lim[ti];
+  const dataStart = sE < S.s[0];
+  const visible = asd >= LOOK_MAX ? true : d <= asd;
+  const E = at(sE, EYE), A = at(sA, OBJ);
+  // locate the worst intermediate point for the marker (20-m points; the model used 10 m)
+  let jE = 0;
+  while (jE < S.s.length - 1 && S.s[jE + 1] <= sE) jE++;
+  let block = null;
+  if (!visible && d > 0) {
+    const L = Math.hypot(S.x[ti] - E.x, -S.y[ti] - E.z);
+    let best = -Infinity, bi = -1;
+    for (let m = jE + 1; m < ti; m++) {
+      const f = (S.s[m] - sE) / (sA - sE);
+      let v;
+      if (lim === 2) v = (S.z[m] - zmin) - ((E.y + f * (A.y - E.y)) / state.exag);   // road above the sight line
+      else v = Math.abs((S.x[m] - E.x) * (-S.y[ti] - E.z) - (-S.y[m] - E.z) * (S.x[ti] - E.x)) / L;  // lateral deviation
+      if (v > best) { best = v; bi = m; }
+    }
+    if (bi >= 0) block = { i: bi, v: best };
+  }
+  return { sA, sE, d, asd, ssd, lim, visible, dataStart, E, A, block };
+}
+
+// ---------- per-frame update ----------
+const LAB = $("labels");
+const labels = [];
+function label(text, cls, pos) { labels.push({ text, cls, pos }); }
+function drawLabels() {
+  LAB.innerHTML = "";
+  const w = stage.clientWidth, h = stage.clientHeight;
+  for (const l of labels) {
+    const v = l.pos.clone().project(camera);
+    if (v.z > 1 || v.x < -1.1 || v.x > 1.1 || v.y < -1.1 || v.y > 1.1) continue;
+    const el = document.createElement("div");
+    el.className = "lab " + l.cls;
+    el.textContent = l.text;
+    el.style.left = ((v.x + 1) / 2 * w) + "px";
+    el.style.top = ((1 - v.y) / 2 * h) + "px";
+    LAB.appendChild(el);
+  }
+  // push overlapping labels upwards, earlier (more important) labels stay put
+  const placed = [];
+  for (const el of LAB.children) {
+    let r = el.getBoundingClientRect(), top = parseFloat(el.style.top);
+    for (let k = 0; k < 12; k++) {
+      const hit = placed.find((q) => r.left < q.right && r.right > q.left && r.top < q.bottom && r.bottom > q.top);
+      if (!hit) break;
+      top -= (r.bottom - hit.top) + 3;
+      el.style.top = top + "px";
+      r = el.getBoundingClientRect();
+    }
+    placed.push(r);
+  }
+}
+
+function update() {
+  const I = sightInfo();
+  // driver car
+  const tE = tangentAt(I.sE);
+  drv.position.copy(at(I.sE));
+  drv.rotation.y = Math.atan2(-tE.z, tE.x);
+  drv.scale.set(1, state.exag, 1);
+  drv.visible = state.view !== "drive";
+  // sight line
+  sightLine.geometry.setFromPoints([I.E, I.A]);
+  sightLine.material.color.set(I.visible ? 0x3ddc97 : 0xff4d4d);
+  blockMark.visible = !!I.block;
+  labels.length = 0;
+  label(`救護車　${S.ref === "1" && S.kind === "高架" ? "高架 " : ""}${fmt(S.km[state.ti], 1)}K`, "amb", at(I.sA, 4.5 * state.exag));
+  if (state.view !== "drive") label(`駕駛　${fmt(I.d)} m`, "drv", at(I.sE, 2.6 * state.exag));
+  if (I.block) {
+    const bp = P(I.block.i, 0.1);
+    blockMark.position.copy(bp);
+    // the browser only has the 20-m points, so the amount may fall short of the 10-m model's; show it when it agrees
+    const amt = I.lim === 2 ? (I.block.v > 0 ? `（路面高出視線 ${fmt(I.block.v, 1)} m）` : "") : (I.block.v > CLEAR ? `（視線偏離中心 ${fmt(I.block.v)} m）` : "");
+    label((I.lim === 2 ? "坡頂擋住視線" : "彎道擋住視線") + amt, "blk", P(I.block.i, 8 * state.exag));
+  }
+  for (const p of posts) if (state.view !== "drive" || p.m <= 300) label(`${p.m} m`, "post", p.top);
+  // camera
+  if (state.view === "drive") {
+    const ahead = at(Math.min(I.sA + 40, I.sE + 80), EYE * 0.6);
+    camera.position.copy(I.E);
+    camera.lookAt(ahead);
+    controls.enabled = false;
+  } else {
+    controls.enabled = true;
+    controls.target.copy(at(I.sA, 1));
+    if (!state.userOrbit) {
+      // three-quarter view from behind and beside the driver, so a crest hides the ambulance on screen too
+      const mid = at((I.sA + I.sE) / 2, 0);
+      const t = tangentAt((I.sA + I.sE) / 2);
+      const side = new THREE.Vector3(-t.z, 0, t.x);
+      camera.position.copy(mid).add(t.clone().multiplyScalar(-(I.d * 0.6 + 90))).add(side.multiplyScalar(-(I.d * 0.35 + 50)))
+        .add(new THREE.Vector3(0, (I.d * 0.3 + 45) * Math.max(1, state.exag * 0.7), 0));
+      camera.lookAt(controls.target);
+    }
+    controls.update();
+  }
+  matWall.opacity = state.view === "drive" ? 0.88 : 0.3;
+  $("hint").hidden = state.view === "drive";
+  // HUD
+  const cls = S.risk[state.ti];
+  const clsName = { 2: "紅", 1: "黃", 0: "綠", "-1": "資料不足" }[cls];
+  let st, stCls;
+  if (I.visible) {
+    if (I.d >= I.ssd) { st = `看得到。從這裡煞車停得住（需要 ${fmt(I.ssd)} m）`; stCls = "ok"; }
+    else { st = `看得到，但只剩 ${fmt(I.d)} m：煞不住（需要 ${fmt(I.ssd)} m）`; stCls = "warn"; }
+  } else {
+    st = `看不到：被${LIMIT_NAME[I.lim] || "前方"}擋住`;
+    if (I.d <= I.ssd) st += `，而且已經來不及煞停`;
+    stCls = "no";
+  }
+  $("hud").innerHTML = `<div class="t">${S.title}　${S.county}${S.kind === "高架" ? "・高架" : ""}</div>` +
+    `<div class="row"><span>駕駛距離救護車</span><span>${fmt(I.d)} m</span></div>` +
+    `<div class="row"><span>模型可用視距</span><span>${I.asd >= LOOK_MAX ? "≥ 600" : fmt(I.asd)} m${I.lim ? "（" + LIMIT_NAME[I.lim] + "）" : ""}</span></div>` +
+    `<div class="row"><span>停車視距（110 km/h，坡度 ${fmt(S.grade[state.ti], 1)}%）</span><span>${fmt(I.ssd)} m</span></div>` +
+    `<div class="row"><span>決策視距</span><span>${DSD} m</span></div>` +
+    `<div class="row"><span>此點分級</span><span>${clsName}</span></div>` +
+    `<div class="st ${stCls}">${st}</div>`;
+  drawCharts(I);
+}
+
+// ---------- charts ----------
+const SVGNS = "http://www.w3.org/2000/svg";
+function el(tag, attrs, text) { const e = document.createElementNS(SVGNS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (text != null) e.textContent = text; return e; }
+function drawCharts(I) {
+  // profile
+  const svg = $("prof"); svg.innerHTML = "";
+  const W = 720, H = 220, L = 40, R = 12, T = 12, B = 28;
+  const s0 = S.s[0], s1 = S.s[S.s.length - 1];
+  const zlo = Math.min(...S.z) - 2, zhi = Math.max(...S.z) + 4;
+  const X = (s) => L + (s - s0) / (s1 - s0) * (W - L - R);
+  const Y = (z) => T + (zhi - z) / (zhi - zlo) * (H - T - B);
+  const grid = el("g", { class: "grid" });
+  for (let z = Math.ceil(zlo / 10) * 10; z <= zhi; z += 10) { grid.append(el("line", { x1: L, x2: W - R, y1: Y(z), y2: Y(z) })); grid.append(el("text", { x: L - 4, y: Y(z) + 4, "text-anchor": "end" }, z + " m")); }
+  svg.append(grid);
+  // km ticks
+  for (let i = 0; i < S.s.length; i += 25) svg.append(el("text", { x: X(S.s[i]), y: H - 8, "text-anchor": "middle" }, fmt(S.km[i], 1) + "K"));
+  // risk strip under the profile
+  for (let i = 0; i < S.s.length - 1; i++) svg.append(el("rect", { x: X(S.s[i]), y: H - B + 2, width: X(S.s[i + 1]) - X(S.s[i]) + 0.5, height: 5, fill: "#" + RISK_HEX[S.risk[i]].toString(16).padStart(6, "0") }));
+  // surface
+  const path = S.s.map((s, i) => `${i ? "L" : "M"}${X(s).toFixed(1)},${Y(S.z[i]).toFixed(1)}`).join("") + `L${X(s1)},${Y(zlo)}L${X(s0)},${Y(zlo)}Z`;
+  svg.append(el("path", { d: path, fill: "color-mix(in srgb, var(--muted) 25%, transparent)", stroke: "var(--fg)", "stroke-width": 1.2 }));
+  // stopping band, sight line, points
+  svg.append(el("rect", { x: X(Math.max(s0, I.sA - I.ssd)), y: T, width: X(I.sA) - X(Math.max(s0, I.sA - I.ssd)), height: H - T - B, fill: "rgba(211,58,44,.12)" }));
+  const zE = at(I.sE).y / state.exag + zmin + EYE, zA = S.z[state.ti] + OBJ;
+  svg.append(el("line", { x1: X(I.sE), y1: Y(zE), x2: X(I.sA), y2: Y(zA), stroke: I.visible ? "var(--green)" : "var(--red)", "stroke-width": 2 }));
+  if (I.block && I.lim === 2) svg.append(el("circle", { cx: X(S.s[I.block.i]), cy: Y(S.z[I.block.i]), r: 6, fill: "none", stroke: "#ffb547", "stroke-width": 2 }));
+  svg.append(el("circle", { cx: X(I.sE), cy: Y(zE), r: 4.5, fill: "var(--blue)" }));
+  svg.append(el("circle", { cx: X(I.sA), cy: Y(zA), r: 4.5, fill: "var(--red)" }));
+  svg.append(el("text", { x: X(I.sA), y: Y(zA) - 10, "text-anchor": "middle", fill: "var(--fg)" }, "救護車"));
+  svg.append(el("text", { x: X(I.sE), y: Y(zE) - 10, "text-anchor": "middle" }, "駕駛"));
+
+  // plan
+  const pv = $("plan"); pv.innerHTML = "";
+  const PW = 440, PH = 220, pad = 14;
+  const xs = S.x, ys = S.y;
+  const xlo = Math.min(...xs), xhi = Math.max(...xs), ylo = Math.min(...ys), yhi = Math.max(...ys);
+  const sc = Math.min((PW - 2 * pad) / Math.max(1, xhi - xlo), (PH - 2 * pad) / Math.max(1, yhi - ylo));
+  const cx = (xlo + xhi) / 2, cy = (ylo + yhi) / 2;
+  const PX = (x) => PW / 2 + (x - cx) * sc, PY = (y) => PH / 2 - (y - cy) * sc;
+  for (let i = 0; i < xs.length - 1; i++) pv.append(el("line", { x1: PX(xs[i]), y1: PY(ys[i]), x2: PX(xs[i + 1]), y2: PY(ys[i + 1]), stroke: "#" + RISK_HEX[S.risk[i]].toString(16).padStart(6, "0"), "stroke-width": 5, "stroke-linecap": "round" }));
+  const E2 = [at(I.sE).x, -at(I.sE).z], A2 = [xs[state.ti], ys[state.ti]];
+  pv.append(el("line", { x1: PX(E2[0]), y1: PY(E2[1]), x2: PX(A2[0]), y2: PY(A2[1]), stroke: I.visible ? "var(--green)" : "var(--red)", "stroke-width": 2 }));
+  if (I.block && I.lim === 1) pv.append(el("circle", { cx: PX(xs[I.block.i]), cy: PY(ys[I.block.i]), r: 6, fill: "none", stroke: "#ffb547", "stroke-width": 2 }));
+  pv.append(el("circle", { cx: PX(E2[0]), cy: PY(E2[1]), r: 4.5, fill: "var(--blue)" }));
+  pv.append(el("circle", { cx: PX(A2[0]), cy: PY(A2[1]), r: 4.5, fill: "var(--red)" }));
+  const arrow = tangentAt(S.s[Math.floor(S.s.length / 2)]);
+  pv.append(el("text", { x: pad, y: PH - 6 }, `行車方向 ${S.direction}　曲率半徑 ${S.radius[state.ti] >= 99999 ? "直線" : S.radius[state.ti] + " m"}`));
+  void arrow;
+}
+
+// ---------- UI ----------
+const sel = $("sel");
+D.stretches.forEach((s, i) => { const o = document.createElement("option"); o.value = i; o.textContent = `${s.title}（${s.county}）${s.limit} ${s.length_m} m`; sel.append(o); });
+$("n-red").textContent = D.n_red.toLocaleString();
+const tbody = document.querySelector("#tbl tbody");
+D.stretches.forEach((s, i) => {
+  const tr = document.createElement("tr");
+  tr.innerHTML = `<td class="num">${i + 1}</td><td><span class="sw" style="background:#d33a2c"></span>${s.title}${s.kind === "高架" ? "（高架）" : ""}</td><td>${s.county}</td><td>${s.limit}</td>` +
+    `<td class="num">${(s.length_m / 1000).toFixed(1)} km</td><td class="num">${s.min_asd} m</td><td class="num">${s.ssd_worst} m</td>`;
+  tr.addEventListener("click", () => { selectStretch(i); $("stage").scrollIntoView({ block: "center", behavior: "smooth" }); });
+  tbody.append(tr);
+});
+function selectStretch(i) {
+  state.si = i; S = D.stretches[i];
+  sel.value = i;
+  [...tbody.children].forEach((tr, j) => tr.classList.toggle("sel", j === i));
+  state.ti = S.worst;
+  const tiEl = $("ti"); tiEl.min = S.range[0]; tiEl.max = S.range[1]; tiEl.value = S.worst;
+  state.d = Math.max(20, Math.round(S.ssd[S.worst] / 10) * 10);   // start where braking would have to begin
+  $("d").value = state.d;
+  stopPlay();
+  build();
+  syncVals();
+}
+function syncVals() {
+  $("ti-val").textContent = `${fmt(S.km[state.ti], 1)}K（可用視距 ${S.asd[state.ti] >= LOOK_MAX ? "≥ 600" : S.asd[state.ti]} m）`;
+  $("d-val").textContent = `${fmt(state.d)} m`;
+}
+sel.addEventListener("change", () => selectStretch(+sel.value));
+$("ti").addEventListener("input", (e) => { state.ti = +e.target.value; stopPlay(); rebuildDynamic(false); syncVals(); });
+$("d").addEventListener("input", (e) => { state.d = +e.target.value; stopPlay(); update(); syncVals(); });
+function setView(v) {
+  state.view = v; state.userOrbit = false;
+  $("v-drive").classList.toggle("on", v === "drive");
+  $("v-orbit").classList.toggle("on", v === "orbit");
+  if (v === "drive" && state.exag !== 1) { state.exag = 1; $("exag").textContent = "高程 ×1"; build(); }
+  update();
+}
+$("v-drive").addEventListener("click", () => setView("drive"));
+$("v-orbit").addEventListener("click", () => setView("orbit"));
+$("exag").addEventListener("click", () => {
+  state.exag = state.exag === 1 ? 3 : 1;
+  $("exag").textContent = `高程 ×${state.exag}`;
+  if (state.view === "drive") setView("orbit"); else { state.userOrbit = false; build(); }
+});
+
+// play: approach at 110 km/h in real time
+let lastT = 0;
+function stopPlay() { state.playing = false; $("play").textContent = "▶ 以 110 km/h 接近"; }
+$("play").addEventListener("click", () => {
+  if (state.playing) { stopPlay(); return; }
+  if (state.d <= 10) { state.d = LOOK_MAX; $("d").value = state.d; }
+  state.playing = true; state.seenAt = null; lastT = performance.now();
+  $("play").textContent = "⏸ 暫停";
+});
+const toast = $("toast");
+let toastTimer = 0;
+function say(text, ms = 2200) { toast.textContent = text; toast.classList.add("show"); clearTimeout(toastTimer); toastTimer = setTimeout(() => toast.classList.remove("show"), ms); }
+
+function frame(t) {
+  requestAnimationFrame(frame);
+  if (!S) return;
+  const blink = Math.floor(t / 250) % 2;
+  lightA.material.color.set(blink ? 0xff3b3b : 0x5a0000);
+  lightB.material.color.set(blink ? 0x1a0060 : 0x3b7bff);
+  blockMark.scale.setScalar(1 + 0.15 * Math.sin(t / 200));
+  if (state.playing) {
+    const dt = Math.min(0.1, (t - lastT) / 1000); lastT = t;
+    const before = state.d;
+    state.d = Math.max(0, state.d - SPEED * dt);
+    const asd = S.asd[state.ti], ssd = S.ssd[state.ti];
+    if (before > asd && state.d <= asd && asd < LOOK_MAX) say(`看見了！距離 ${fmt(asd)} m，煞停需要 ${fmt(ssd)} m`, 2600);
+    if (before > ssd && state.d <= ssd && (asd < LOOK_MAX ? asd < ssd : false)) say(`已經來不及煞停，還沒看見救護車`, 2600);
+    $("d").value = Math.round(state.d);
+    syncVals();
+    update();
+    if (state.d <= 0) stopPlay();
+  } else if (state.view === "orbit") { controls.update(); }
+  renderer.render(scene, camera);
+  drawLabels();
+}
+selectStretch(0);
+requestAnimationFrame(frame);
+window.addEventListener("resize", () => { resize(); update(); });
+window.sightReady = true;
+</script>
+</body>
+</html>
