@@ -8,7 +8,9 @@ Run after 03_route.py and 04_maps.py (needs data/processed/stations_snapped.csv 
 output/points_100m.csv built from the same OSM extract).
 
 Outputs:
-  output/<county>_ranked_points.csv   every 100-m point in the county: three fastest stations and times
+  output/<county>_ranked_points.csv   every 100-m point in the county: three fastest stations and times,
+                                      plus the fastest station of each of the three counties
+                                      (taipei_/newtaipei_/taoyuan_ label and min)
   output/<county>_cross_county.csv    contiguous stretches where a station of another county is fastest
   output/ranked.html                  stand-alone page (map, top-three panel and table per county)
 with <county> = taipei, newtaipei, taoyuan.
@@ -105,12 +107,23 @@ def compute():
     tp["own_label"] = cand.label.values[k]
     tp["own_min"] = np.round(T[k, cols] / 60, 2)
     tp["own_rank"] = (T < T[k, cols]).sum(axis=0) + 1
+    # fastest station of each of the three counties at every point. The top three alone cannot answer
+    # "is county A faster than county B here" where neither, or only one, is among them (e.g. the
+    # 五楊高架 北上 stretch in 新北市 that 桃園市 stations reach first).
+    for county, slug in COUNTIES.items():
+        idx = np.flatnonzero(cand.name.str.startswith(county).values)
+        kc = idx[np.argmin(T[idx], axis=0)]
+        t = T[kc, cols]
+        ok = np.isfinite(t)                      # no station of that county within TIME_LIMIT_S
+        tp[f"{slug}_label"] = np.where(ok, cand.label.values[kc], "")
+        tp[f"{slug}_min"] = np.where(ok, np.round(t / 60, 2), np.nan)
     agree = ((tp.t1_min - tp.time_min).abs() <= 0.01).mean()
     print(f"fastest time agrees with the main analysis at {agree:.1%} of points")
     tp["elevated"] = tp.road_name.fillna("").isin(ELEVATED)
     keepcols = (["chain", "ref", "direction", "kind", "elevated", "road_name", "s_m", "km", "lon", "lat", "county"]
                 + [c for i in range(1, TOP + 1) for c in (f"s{i}", f"s{i}_label", f"s{i}_county", f"t{i}_min")]
-                + ["own_label", "own_min", "own_rank"])
+                + ["own_label", "own_min", "own_rank"]
+                + [c for slug in COUNTIES.values() for c in (f"{slug}_label", f"{slug}_min")])
     return tp[keepcols]
 
 
