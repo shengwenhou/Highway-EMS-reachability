@@ -26,7 +26,8 @@ spec = importlib.util.spec_from_file_location("route", ROOT / "scripts" / "03_ro
 r = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(r)
 
-RAMP_NAME = "大洲交流道"
+RAMP_NAMES = ("大洲交流道", "北外環交流道")   # OSM renamed the ramps to 北外環交流道 after the opening
+RAMP_NAME = "／".join(RAMP_NAMES)
 KM_RANGE = (305, 325)      # project mileage; the interchange sits at about 316.1-316.3K here
 STATION_ROWS = 12
 
@@ -37,7 +38,7 @@ class RampCollector(osmium.SimpleHandler):
         self.ways = {}
 
     def way(self, w):
-        if w.tags.get("name") == RAMP_NAME and "highway" in w.tags:
+        if w.tags.get("name") in RAMP_NAMES and "highway" in w.tags:
             self.ways[w.id] = {"type": "way", "id": w.id, "nodes": [nd.ref for nd in w.nodes],
                                "geometry": [{"lat": nd.location.lat, "lon": nd.location.lon} for nd in w.nodes],
                                "tags": {**dict(w.tags), "highway": "motorway_link"}}
