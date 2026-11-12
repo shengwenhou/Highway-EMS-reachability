@@ -177,7 +177,7 @@
 
 南下沒有新入口，北上沒有新出口，所以「南下救護反應」與「北上送醫」不受影響。
 
-**計算方式**：用同一份 OSM（2026-11-12，通車後）建兩次路網，一次不含、一次含新匝道，其餘設定都和主分析相同。通車後 OSM 已把匝道標為正式道路（`motorway_link`），名稱由「大洲交流道」改為「北外環交流道」，`09_dazhou.py` 兩個名稱都認得。逐點結果存在 `output/dazhou_points.csv`（國 1 305–325K，每 100 m）。新匝道在專案里程約 317.2K（北上匯入）與 317.0K（南下分流）。
+**計算方式**：用同一份 OSM（2026-11-12，通車後）建兩次路網，一次不含、一次含新匝道，其餘設定都和主分析相同。通車後 OSM 已把匝道標為正式道路（`motorway_link`），名稱由「大洲交流道」改為「北外環交流道」，`11_dazhou.py` 兩個名稱都認得。逐點結果存在 `output/dazhou_points.csv`（國 1 305–325K，每 100 m）。新匝道在專案里程約 317.2K（北上匯入）與 317.0K（南下分流）。
 
 第一次試算用的是通車前一天（2026-10-27）的圖資，當時匝道還標為施工中（`highway=construction`），是手動改成 `motorway_link` 來算的。通車後重跑，匝道位置略有調整，各分隊到匯入點的時間少約 0.2 分，其餘結論完全相同。
 
@@ -213,7 +213,7 @@
 - **可能有幫助**：高公局估計可分掉臺 1 線約三成車流，並減輕永康交流道的壅塞。救護車上國道、往奇美送醫，正好都靠永康交流道和臺 1 線，尖峰時段應會受益，但模型不含塞車，無法量化。派遣時可以參考：南下送醫若永康出口排隊超過約 1.7 分鐘，改從新出口送奇美較快。
 - **可能有風險**：國 1 南下 315–320K 的事故率是全國第 9 高（每億車公里 25.4 件，見下方事故地圖）。新的南下出口和永康出口很近，北上新入口匯入後又接近臺南系統，交織增加，事故與救護出勤可能變多，要等通車後的事故資料確認。
 
-匝道現在是 OSM 的正式道路，重跑 `01_fetch_osm.py` 與 `03_route.py` 就會自動納入主分析；`09_dazhou.py` 依名稱找匝道（新舊名稱皆可），之後仍能重算這份對照。執行時需要 `data/raw/taiwan.osm.pbf`（用 `--geofabrik` 抓的檔名是 `taiwan-latest.osm.pbf`，複製或連結成該檔名即可）。
+匝道現在是 OSM 的正式道路，重跑 `01_fetch_osm.py` 與 `03_route.py` 就會自動納入主分析；`11_dazhou.py` 依名稱找匝道（新舊名稱皆可），之後仍能重算這份對照。執行時需要 `data/raw/taiwan.osm.pbf`（用 `--geofabrik` 抓的檔名是 `taiwan-latest.osm.pbf`，複製或連結成該檔名即可）。
 
 ## 國道事故地圖（A1＋A2）
 
@@ -482,8 +482,8 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt   # 另需 ap
 .venv/bin/python scripts/06_trivia.py         # 冷知識圖卡 → output/trivia.html
 .venv/bin/python scripts/07_wuyang.py         # 汐五・五楊高架救護分工 → output/wuyang.html
 .venv/bin/python scripts/08_crashes.py        # 國道事故地圖（下載警政署 A1/A2 資料與高公局交通量）→ output/crash.html
-.venv/bin/python scripts/09_dazhou.py         # 新交流道評估：國 1 × 北外環，有／無新匝道對照 → output/dazhou_points.csv
 .venv/bin/python scripts/09_sight_scene.py    # 救護風險 3D 原型（只需 output/ 的 CSV）→ output/sight.html
+.venv/bin/python scripts/11_dazhou.py         # 新交流道評估：國 1 × 北外環，有／無新匝道對照 → output/dazhou_points.csv
 .venv/bin/python scripts/05_trace.py 3 南下 301 hospital   # （選用）印出某一段的實際路線
 ```
 
